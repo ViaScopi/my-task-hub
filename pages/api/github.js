@@ -20,6 +20,7 @@ export default async function handler(req, res) {
         url: issue.html_url,
         repo: issue.repository.full_name,
         issue_number: issue.number,
+        description: issue.body || "",
       }));
 
       return res.status(200).json(tasks);
@@ -31,7 +32,18 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
-      const { owner, repo, issue_number } = req.body;
+      const { owner, repo, issue_number, comment } = req.body;
+
+      const trimmedComment = comment?.trim();
+
+      if (trimmedComment) {
+        await octokit.rest.issues.createComment({
+          owner,
+          repo,
+          issue_number,
+          body: trimmedComment,
+        });
+      }
 
       await octokit.rest.issues.update({
         owner,
