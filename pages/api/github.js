@@ -13,8 +13,8 @@ export default async function handler(req, res) {
         per_page: 50, // adjust if you want more
       });
 
-      const tasks = data.map(issue => ({
-        id: issue.id,
+      const tasks = data.map((issue) => ({
+        id: `github-${issue.id}`,
         source: "GitHub",
         title: issue.title,
         url: issue.html_url,

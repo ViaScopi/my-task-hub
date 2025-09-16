@@ -8,9 +8,9 @@ export default function Home() {
           <span className="hero__eyebrow">Focus. Finish. Ship.</span>
           <h1>My Task Hub</h1>
           <p>
-            A polished cockpit for your assigned GitHub issues. Scan what needs
-            attention, add a quick update, and close things out without jumping
-            between tabs.
+            A polished cockpit for your assigned GitHub issues and Google Tasks. Scan what
+            needs attention, reshuffle pipelines, add a quick update, and close things out
+            without jumping between tabs.
           </p>
         </header>
         <section className="task-section">
