@@ -153,6 +153,21 @@ main {
   max-width: 36rem;
 }
 
+.task-card__notice {
+  margin: 0 0 clamp(1rem, 2vw, 1.5rem) 0;
+  padding: 0.85rem 1.1rem;
+  border-radius: 16px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+.task-card__notice--warning {
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: #92400e;
+}
+
 .task-card__items {
   list-style: none;
   margin: 0;
@@ -200,6 +215,13 @@ main {
   gap: 0.2rem;
 }
 
+.task-item__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
 .task-item__title {
   font-weight: 600;
   color: var(--slate-900);
@@ -216,6 +238,66 @@ main {
   margin: 0;
   font-size: 0.85rem;
   color: var(--slate-500);
+}
+
+.task-item__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.65rem;
+  text-transform: uppercase;
+}
+
+.task-item__badge--github {
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--accent-strong);
+}
+
+.task-item__badge--google {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success-strong);
+}
+
+.task-item__badge--default {
+  background: rgba(148, 163, 184, 0.2);
+  color: var(--slate-600);
+}
+
+.task-item__pipeline {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.85rem;
+}
+
+.task-item__pipeline label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--slate-600);
+}
+
+.task-item__pipeline-select {
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  padding: 0.55rem 0.8rem;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--slate-700);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.task-item__pipeline-select:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
+.task-item__pipeline-select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .task-item__description {
@@ -366,6 +448,10 @@ main {
   margin: 0;
   color: var(--slate-600);
   max-width: 26rem;
+}
+
+.task-state__message--muted {
+  color: var(--slate-500);
 }
 
 @keyframes spin {
