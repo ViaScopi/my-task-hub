@@ -316,6 +316,7 @@ function buildAuthHeaderOptions(token) {
     { Authorization: `Bearer ${trimmedToken}` },
     { Authorization: trimmedToken },
     { Authorization: `Token token=${trimmedToken}` },
+    { "X-API-KEY": trimmedToken },
     { "X-Api-Key": trimmedToken },
   ];
 
