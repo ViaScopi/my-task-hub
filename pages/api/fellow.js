@@ -313,7 +313,9 @@ async function executeQuery(endpoint, token, query, variables) {
 
   if (!response.ok) {
     const message = payload?.error || payload?.message || payload?.errors?.[0]?.message;
-    throw new Error(message || "Failed to load Fellow action items.");
+    const error = new Error(message || "Failed to load Fellow action items.");
+    error.status = response.status;
+    throw error;
   }
 
   if (!payload || typeof payload !== "object") {
@@ -399,6 +401,21 @@ export default async function handler(req, res) {
   } catch (error) {
     if (error.code === MISSING_CREDENTIALS_ERROR) {
       return res.status(503).json({ error: error.message });
+    }
+
+    const status = Number.isInteger(error.status) ? error.status : null;
+
+    if (status === 401 || status === 403) {
+      console.error("Fellow API authentication error:", error);
+      return res.status(503).json({
+        error:
+          "Fellow integration authentication failed. Please verify the configured FELLOW_API_TOKEN.",
+      });
+    }
+
+    if (status && status >= 400 && status < 600) {
+      console.error("Fellow API error:", error);
+      return res.status(status).json({ error: error.message || "Failed to load Fellow action items." });
     }
 
     console.error("Fellow API error:", error);
