@@ -140,6 +140,206 @@ const FALLBACK_QUERIES = [
     query AssignedActionItems($first: Int!) {
       viewer {
         id
+        actionItems: assignedActionItemsConnection(first: $first) {
+          nodes {
+            id
+            content
+            htmlContent
+            url
+            dueDate
+            status
+            meeting {
+              id
+              title
+              url
+            }
+            stream {
+              id
+              name
+              url
+            }
+          }
+        }
+      }
+    }
+  `,
+  /* GraphQL */ `
+    query AssignedActionItems($first: Int!) {
+      viewer {
+        id
+        actionItems: assignedActionItemsConnection(first: $first) {
+          edges {
+            node {
+              id
+              content
+              htmlContent
+              url
+              dueDate
+              status
+              meeting {
+                id
+                title
+                url
+              }
+              stream {
+                id
+                name
+                url
+              }
+            }
+          }
+        }
+      }
+    }
+  `,
+  /* GraphQL */ `
+    query AssignedActionItems($first: Int!) {
+      viewer {
+        id
+        actionItems: actionItemsConnection(first: $first) {
+          nodes {
+            id
+            content
+            htmlContent
+            url
+            dueDate
+            status
+            meeting {
+              id
+              title
+              url
+            }
+            stream {
+              id
+              name
+              url
+            }
+          }
+        }
+      }
+    }
+  `,
+  /* GraphQL */ `
+    query AssignedActionItems($first: Int!) {
+      viewer {
+        id
+        actionItems: actionItemsConnection(first: $first) {
+          edges {
+            node {
+              id
+              content
+              htmlContent
+              url
+              dueDate
+              status
+              meeting {
+                id
+                title
+                url
+              }
+              stream {
+                id
+                name
+                url
+              }
+            }
+          }
+        }
+      }
+    }
+  `,
+  /* GraphQL */ `
+    query AssignedActionItems($first: Int!) {
+      viewer {
+        id
+        actionItemAssignments: actionItemAssignmentsConnection(first: $first) {
+          nodes {
+            id
+            url
+            dueDate
+            status
+            meeting {
+              id
+              title
+              url
+            }
+            stream {
+              id
+              name
+              url
+            }
+            actionItem {
+              id
+              content
+              htmlContent
+              url
+              dueDate
+              status
+              meeting {
+                id
+                title
+                url
+              }
+              stream {
+                id
+                name
+                url
+              }
+            }
+          }
+        }
+      }
+    }
+  `,
+  /* GraphQL */ `
+    query AssignedActionItems($first: Int!) {
+      viewer {
+        id
+        actionItemAssignments: actionItemAssignmentsConnection(first: $first) {
+          edges {
+            node {
+              id
+              url
+              dueDate
+              status
+              meeting {
+                id
+                title
+                url
+              }
+              stream {
+                id
+                name
+                url
+              }
+              actionItem {
+                id
+                content
+                htmlContent
+                url
+                dueDate
+                status
+                meeting {
+                  id
+                  title
+                  url
+                }
+                stream {
+                  id
+                  name
+                  url
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `,
+  /* GraphQL */ `
+    query AssignedActionItems($first: Int!) {
+      viewer {
+        id
         actionItems(first: $first) {
           nodes {
             id
@@ -180,6 +380,10 @@ function collectNodes(collection) {
 
   if (Array.isArray(collection.edges)) {
     return collection.edges.map((edge) => edge?.node || edge).filter(Boolean);
+  }
+
+  if (Array.isArray(collection.items)) {
+    return collection.items;
   }
 
   return [];
@@ -244,12 +448,22 @@ function mapActionItemsToTasks(data) {
       viewer.assignedActionItems,
       viewer.actionItems,
       viewer.actionItemAssignments,
+      viewer.assignedActionItemsConnection,
+      viewer.actionItemsConnection,
+      viewer.actionItemAssignmentsConnection,
       viewer.tasks,
       viewer.items
     );
   }
 
-  containers.push(data.assignedActionItems, data.actionItems, data.actionItemAssignments);
+  containers.push(
+    data.assignedActionItems,
+    data.actionItems,
+    data.actionItemAssignments,
+    data.assignedActionItemsConnection,
+    data.actionItemsConnection,
+    data.actionItemAssignmentsConnection
+  );
 
   const items = [];
   const seen = new Set();
