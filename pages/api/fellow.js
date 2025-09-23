@@ -299,25 +299,44 @@ function mapActionItemsToTasks(data) {
   });
 }
 
-async function executeQuery(endpoint, token, query, variables) {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+const AUTH_HEADER_PREFIX_PATTERN = /^(Bearer|Token|Basic)\s/i;
 
-  const payload = await response.json().catch(() => null);
+function buildAuthHeaderOptions(token) {
+  const trimmedToken = token.trim();
 
-  if (!response.ok) {
-    const message = payload?.error || payload?.message || payload?.errors?.[0]?.message;
-    const error = new Error(message || "Failed to load Fellow action items.");
-    error.status = response.status;
-    throw error;
+  if (!trimmedToken) {
+    return [];
   }
 
+  if (AUTH_HEADER_PREFIX_PATTERN.test(trimmedToken)) {
+    return [{ Authorization: trimmedToken }];
+  }
+
+  const candidates = [
+    { Authorization: `Bearer ${trimmedToken}` },
+    { Authorization: trimmedToken },
+    { Authorization: `Token token=${trimmedToken}` },
+    { "X-Api-Key": trimmedToken },
+  ];
+
+  const seen = new Set();
+
+  return candidates.filter((headers) => {
+    const key = Object.entries(headers)
+      .sort(([aKey], [bKey]) => aKey.localeCompare(bKey))
+      .map(([headerKey, value]) => `${headerKey.toLowerCase()}:${value}`)
+      .join("|");
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function validateGraphQLPayload(payload) {
   if (!payload || typeof payload !== "object") {
     throw new Error("Unexpected response from Fellow.");
   }
@@ -329,6 +348,48 @@ async function executeQuery(endpoint, token, query, variables) {
   }
 
   return payload.data;
+}
+
+async function executeQuery(endpoint, token, query, variables) {
+  const authHeaderOptions = buildAuthHeaderOptions(token);
+
+  if (authHeaderOptions.length === 0) {
+    const error = new Error("Fellow API token is missing.");
+    error.status = 401;
+    throw error;
+  }
+
+  let lastAuthError = null;
+
+  for (const authHeaders of authHeaderOptions) {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const message = payload?.error || payload?.message || payload?.errors?.[0]?.message;
+      const error = new Error(message || "Failed to load Fellow action items.");
+      error.status = response.status;
+
+      if ((response.status === 401 || response.status === 403) && authHeaderOptions.length > 1) {
+        lastAuthError = error;
+        continue;
+      }
+
+      throw error;
+    }
+
+    return validateGraphQLPayload(payload);
+  }
+
+  throw lastAuthError || new Error("Failed to authenticate with Fellow using the provided token.");
 }
 
 function queryUsesVariable(query, variableName) {
