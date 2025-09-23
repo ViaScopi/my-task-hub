@@ -4,7 +4,46 @@ const DEFAULT_LIMIT = 100;
 const MISSING_CREDENTIALS_ERROR = "MISSING_FELLOW_CREDENTIALS";
 
 function getEndpoint() {
-  return process.env.FELLOW_GRAPHQL_ENDPOINT?.trim() || DEFAULT_ENDPOINT;
+  const rawEndpoint = process.env.FELLOW_GRAPHQL_ENDPOINT?.trim();
+
+  if (!rawEndpoint) {
+    return DEFAULT_ENDPOINT;
+  }
+
+  return ensureGraphQLEndpoint(rawEndpoint);
+}
+
+function ensureGraphQLEndpoint(rawEndpoint) {
+  let normalizedEndpoint = rawEndpoint.trim();
+
+  if (!normalizedEndpoint) {
+    return DEFAULT_ENDPOINT;
+  }
+
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(normalizedEndpoint)) {
+    normalizedEndpoint = `https://${normalizedEndpoint}`;
+  }
+
+  const GRAPHQL_PATH_PATTERN = /(^|\/)graphql(\?|#|\/|$)/i;
+
+  try {
+    const endpointUrl = new URL(normalizedEndpoint);
+
+    if (!GRAPHQL_PATH_PATTERN.test(endpointUrl.pathname)) {
+      const trimmedPath = endpointUrl.pathname.replace(/\/+$/, "");
+      const segments = trimmedPath.split("/").filter(Boolean);
+      segments.push("graphql");
+      endpointUrl.pathname = `/${segments.join("/")}`;
+    }
+
+    return endpointUrl.toString();
+  } catch (error) {
+    if (GRAPHQL_PATH_PATTERN.test(normalizedEndpoint)) {
+      return normalizedEndpoint;
+    }
+
+    return `${normalizedEndpoint.replace(/\/+$/, "")}/graphql`;
+  }
 }
 
 function getLimit() {
