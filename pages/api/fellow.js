@@ -352,6 +352,7 @@ export default async function handler(req, res) {
     let lastError;
     let emptyResult = null;
 
+
     for (const query of queries) {
       try {
         const variables = { first: limit };
@@ -372,6 +373,7 @@ export default async function handler(req, res) {
         }
 
         if (customQuery) {
+
           return res.status(200).json(tasks);
         }
 
