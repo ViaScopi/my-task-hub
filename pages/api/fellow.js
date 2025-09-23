@@ -300,6 +300,7 @@ function mapActionItemsToTasks(data) {
 }
 
 const AUTH_HEADER_PREFIX_PATTERN = /^(Bearer|Token|Basic)\s/i;
+const TOKEN_PLACEHOLDER_REGEX = /\{\{\s*token\s*\}\}/gi;
 
 function buildAuthHeaderOptions(token) {
   const trimmedToken = token.trim();
@@ -309,24 +310,130 @@ function buildAuthHeaderOptions(token) {
   }
 
   if (AUTH_HEADER_PREFIX_PATTERN.test(trimmedToken)) {
-    return [{ Authorization: trimmedToken }];
+    return dedupeHeaderOptions([{ Authorization: trimmedToken }]);
   }
 
   const candidates = [
     { Authorization: `Bearer ${trimmedToken}` },
+    { Authorization: `Bearer "${trimmedToken}"` },
     { Authorization: trimmedToken },
+    { Authorization: `Token ${trimmedToken}` },
     { Authorization: `Token token=${trimmedToken}` },
+    { Authorization: `Token token="${trimmedToken}"` },
+    { Authorization: `token ${trimmedToken}` },
+    { Authorization: `token token=${trimmedToken}` },
+    { Authorization: `Basic ${trimmedToken}` },
     { "X-API-KEY": trimmedToken },
     { "X-Api-Key": trimmedToken },
+    { "X-Fellow-Token": trimmedToken },
+    { "X-Fellow-Api-Key": trimmedToken },
+    { "X-Auth-Token": trimmedToken },
+    ...buildCustomAuthHeaders(trimmedToken),
   ];
 
+  return dedupeHeaderOptions(candidates);
+}
+
+function buildCustomAuthHeaders(trimmedToken) {
+  const rawHeaders = process.env.FELLOW_API_TOKEN_HEADERS?.trim();
+
+  if (!rawHeaders) {
+    return [];
+  }
+
+  const parsedHeaders = parseCustomAuthHeaders(rawHeaders);
+
+  if (!parsedHeaders) {
+    return [];
+  }
+
+  return parsedHeaders
+    .map((headerSet) =>
+      Object.entries(headerSet).reduce((acc, [key, value]) => {
+        if (!key) {
+          return acc;
+        }
+
+        const normalizedKey = String(key).trim();
+
+        if (!normalizedKey) {
+          return acc;
+        }
+
+        const resolvedValue = resolveHeaderValue(value, trimmedToken);
+
+        if (resolvedValue === null) {
+          return acc;
+        }
+
+        acc[normalizedKey] = resolvedValue;
+        return acc;
+      }, {})
+    )
+    .filter((headers) => Object.keys(headers).length > 0);
+}
+
+function resolveHeaderValue(value, token) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  return trimmedValue.replace(TOKEN_PLACEHOLDER_REGEX, token);
+}
+
+function parseCustomAuthHeaders(rawHeaders) {
+  try {
+    const parsed = JSON.parse(rawHeaders);
+
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item) => item && typeof item === "object");
+    }
+
+    if (parsed && typeof parsed === "object") {
+      return [parsed];
+    }
+
+    return null;
+  } catch (error) {
+    console.warn(
+      "Failed to parse FELLOW_API_TOKEN_HEADERS. Expected a JSON object or array of objects.",
+      error
+    );
+    return null;
+  }
+}
+
+function dedupeHeaderOptions(options) {
   const seen = new Set();
 
-  return candidates.filter((headers) => {
+  return options.filter((headers) => {
+    if (!headers || typeof headers !== "object") {
+      return false;
+    }
+
     const key = Object.entries(headers)
-      .sort(([aKey], [bKey]) => aKey.localeCompare(bKey))
-      .map(([headerKey, value]) => `${headerKey.toLowerCase()}:${value}`)
+      .filter(([headerKey, value]) => Boolean(headerKey) && value !== undefined && value !== null)
+      .map(([headerKey, value]) => `${headerKey.toLowerCase()}:${String(value)}`)
+      .sort()
       .join("|");
+
+    if (!key) {
+      return false;
+    }
 
     if (seen.has(key)) {
       return false;
