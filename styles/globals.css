@@ -262,6 +262,11 @@ main {
   color: var(--success-strong);
 }
 
+.task-item__badge--fellow {
+  background: rgba(236, 72, 153, 0.12);
+  color: #be185d;
+}
+
 .task-item__badge--default {
   background: rgba(148, 163, 184, 0.2);
   color: var(--slate-600);
@@ -310,6 +315,15 @@ main {
 .task-item__description--muted {
   color: var(--slate-500);
   font-style: italic;
+}
+
+.task-item__meta-detail {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--slate-500);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 
 .task-item__completion {
