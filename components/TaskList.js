@@ -3,7 +3,39 @@ import { useCallback, useEffect, useState } from "react";
 const SOURCE_BADGE_CLASS = {
   GitHub: "github",
   "Google Tasks": "google",
+  Fellow: "fellow",
 };
+
+function formatDueDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const formatter = new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
+  });
+
+  return formatter.format(date);
+}
+
+function formatStatus(value) {
+  if (!value) {
+    return "";
+  }
+
+  return value
+    .toString()
+    .replace(/[_-]+/g, " ")
+    .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+}
 
 export default function TaskList() {
   const [tasks, setTasks] = useState([]);
@@ -46,9 +78,20 @@ export default function TaskList() {
 
             return Array.isArray(data) ? data : [];
           }),
+          fetch("/api/fellow", { signal }).then(async (response) => {
+            const data = await response.json().catch(() => null);
+
+            if (!response.ok) {
+              const error = new Error(data?.error || "Failed to load Fellow action items.");
+              error.status = response.status;
+              throw error;
+            }
+
+            return Array.isArray(data) ? data : [];
+          }),
         ];
 
-        const [githubResult, googleResult] = await Promise.allSettled(requests);
+        const [githubResult, googleResult, fellowResult] = await Promise.allSettled(requests);
 
         if (signal?.aborted) {
           return;
@@ -74,6 +117,14 @@ export default function TaskList() {
           const isConfigError = googleResult.reason?.status === 503;
           errors.push(isConfigError ? "Google Tasks (integration not configured)" : "Google Tasks");
           console.error("Failed to load Google Tasks:", googleResult.reason);
+        }
+
+        if (fellowResult.status === "fulfilled") {
+          combinedTasks.push(...fellowResult.value);
+        } else {
+          const isConfigError = fellowResult.reason?.status === 503;
+          errors.push(isConfigError ? "Fellow (integration not configured)" : "Fellow");
+          console.error("Failed to load Fellow action items:", fellowResult.reason);
         }
 
         setTasks(combinedTasks);
@@ -282,8 +333,8 @@ export default function TaskList() {
           <h2 className="task-card__title">Stay on top of your workstreams</h2>
         </div>
         <p className="task-card__description">
-          Review GitHub issues, keep your Google Tasks organized, and check things off without
-          leaving your cockpit.
+          Review GitHub issues, keep your Google Tasks organized, and stay accountable for your
+          Fellow action items without leaving your cockpit.
         </p>
       </header>
 
@@ -295,6 +346,8 @@ export default function TaskList() {
           const description = task.description?.trim();
           const badgeClass = SOURCE_BADGE_CLASS[task.source] || "default";
           const pipelineState = pipelineStatus[task.id] || {};
+          const dueLabel = formatDueDate(task.dueDate || task.due);
+          const statusLabel = formatStatus(task.status);
 
           return (
             <li key={task.id} className={`task-item${isActive ? " task-item--active" : ""}`}>
@@ -316,8 +369,19 @@ export default function TaskList() {
                     )}
                   </div>
                   <p className="task-item__repo">
-                    {task.source === "GitHub" ? task.repo : `Pipeline: ${task.pipelineName}`}
+                    {task.source === "GitHub"
+                      ? task.repo
+                      : task.source === "Google Tasks"
+                      ? `Pipeline: ${task.pipelineName}`
+                      : task.repo}
                   </p>
+                  {task.source === "Fellow" && (dueLabel || statusLabel) && (
+                    <p className="task-item__meta-detail">
+                      {dueLabel && <span>Due {dueLabel}</span>}
+                      {dueLabel && statusLabel && <span aria-hidden="true"> · </span>}
+                      {statusLabel && <span>{statusLabel}</span>}
+                    </p>
+                  )}
                 </div>
                 {task.source === "GitHub" && !isActive && (
                   <button
