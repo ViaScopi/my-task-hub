@@ -350,6 +350,8 @@ export default async function handler(req, res) {
     const queries = customQuery ? [customQuery] : [DEFAULT_QUERY, ...FALLBACK_QUERIES];
 
     let lastError;
+    let emptyResult = null;
+
 
     for (const query of queries) {
       try {
@@ -362,7 +364,16 @@ export default async function handler(req, res) {
         const data = await executeQuery(endpoint, token, query, variables);
         const tasks = mapActionItemsToTasks(data);
 
-        if (tasks.length || customQuery) {
+        if (tasks.length) {
+          return res.status(200).json(tasks);
+        }
+
+        if (emptyResult === null) {
+          emptyResult = tasks;
+        }
+
+        if (customQuery) {
+
           return res.status(200).json(tasks);
         }
 
@@ -378,6 +389,10 @@ export default async function handler(req, res) {
           console.warn("Fellow query attempt failed:", error.message);
         }
       }
+    }
+
+    if (emptyResult !== null) {
+      return res.status(200).json(emptyResult);
     }
 
     throw lastError || new Error("Failed to load Fellow action items.");
