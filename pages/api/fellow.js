@@ -92,334 +92,6 @@ function ensureConfiguredToken() {
   return token;
 }
 
-const DEFAULT_QUERY = /* GraphQL */ `
-  query AssignedActionItems($first: Int!) {
-    viewer {
-      id
-      actionItems: assignedActionItems(first: $first) {
-        nodes {
-          id
-          content
-          htmlContent
-          url
-          dueDate
-          status
-          meeting {
-            id
-            title
-            url
-          }
-          stream {
-            id
-            name
-            url
-          }
-        }
-      }
-    }
-  }
-`;
-
-const FALLBACK_QUERIES = [
-  /* GraphQL */ `
-    query AssignedActionItems($first: Int!) {
-      viewer {
-        id
-        actionItems: assignedActionItems(first: $first) {
-          nodes {
-            id
-            content
-            htmlContent
-            url
-            dueDate
-            status
-            meeting {
-              id
-              title
-              url
-            }
-            stream {
-              id
-              name
-              url
-            }
-          }
-        }
-      }
-    }
-  `,
-  /* GraphQL */ `
-    query AssignedActionItems($first: Int!) {
-      viewer {
-        id
-        actionItemAssignments(first: $first) {
-          nodes {
-            id
-            url
-            dueDate
-            status
-            meeting {
-              id
-              title
-              url
-            }
-            stream {
-              id
-              name
-              url
-            }
-            actionItem {
-              id
-              content
-              htmlContent
-              url
-              dueDate
-              status
-              meeting {
-                id
-                title
-                url
-              }
-              stream {
-                id
-                name
-                url
-              }
-            }
-          }
-        }
-      }
-    }
-  `,
-  /* GraphQL */ `
-    query AssignedActionItems($first: Int!) {
-      viewer {
-        id
-        actionItems: assignedActionItemsConnection(first: $first) {
-          nodes {
-            id
-            content
-            htmlContent
-            url
-            dueDate
-            status
-            meeting {
-              id
-              title
-              url
-            }
-            stream {
-              id
-              name
-              url
-            }
-          }
-        }
-      }
-    }
-  `,
-  /* GraphQL */ `
-    query AssignedActionItems($first: Int!) {
-      viewer {
-        id
-        actionItems: assignedActionItemsConnection(first: $first) {
-          edges {
-            node {
-              id
-              content
-              htmlContent
-              url
-              dueDate
-              status
-              meeting {
-                id
-                title
-                url
-              }
-              stream {
-                id
-                name
-                url
-              }
-            }
-          }
-        }
-      }
-    }
-  `,
-  /* GraphQL */ `
-    query AssignedActionItems($first: Int!) {
-      viewer {
-        id
-        actionItems: actionItemsConnection(first: $first) {
-          nodes {
-            id
-            content
-            htmlContent
-            url
-            dueDate
-            status
-            meeting {
-              id
-              title
-              url
-            }
-            stream {
-              id
-              name
-              url
-            }
-          }
-        }
-      }
-    }
-  `,
-  /* GraphQL */ `
-    query AssignedActionItems($first: Int!) {
-      viewer {
-        id
-        actionItems: actionItemsConnection(first: $first) {
-          edges {
-            node {
-              id
-              content
-              htmlContent
-              url
-              dueDate
-              status
-              meeting {
-                id
-                title
-                url
-              }
-              stream {
-                id
-                name
-                url
-              }
-            }
-          }
-        }
-      }
-    }
-  `,
-  /* GraphQL */ `
-    query AssignedActionItems($first: Int!) {
-      viewer {
-        id
-        actionItemAssignments: actionItemAssignmentsConnection(first: $first) {
-          nodes {
-            id
-            url
-            dueDate
-            status
-            meeting {
-              id
-              title
-              url
-            }
-            stream {
-              id
-              name
-              url
-            }
-            actionItem {
-              id
-              content
-              htmlContent
-              url
-              dueDate
-              status
-              meeting {
-                id
-                title
-                url
-              }
-              stream {
-                id
-                name
-                url
-              }
-            }
-          }
-        }
-      }
-    }
-  `,
-  /* GraphQL */ `
-    query AssignedActionItems($first: Int!) {
-      viewer {
-        id
-        actionItemAssignments: actionItemAssignmentsConnection(first: $first) {
-          edges {
-            node {
-              id
-              url
-              dueDate
-              status
-              meeting {
-                id
-                title
-                url
-              }
-              stream {
-                id
-                name
-                url
-              }
-              actionItem {
-                id
-                content
-                htmlContent
-                url
-                dueDate
-                status
-                meeting {
-                  id
-                  title
-                  url
-                }
-                stream {
-                  id
-                  name
-                  url
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  `,
-  /* GraphQL */ `
-    query AssignedActionItems($first: Int!) {
-      viewer {
-        id
-        actionItems(first: $first) {
-          nodes {
-            id
-            content
-            htmlContent
-            url
-            dueDate
-            status
-            meeting {
-              id
-              title
-              url
-            }
-            stream {
-              id
-              name
-              url
-            }
-          }
-        }
-      }
-    }
-  `,
-];
-
 function collectNodes(collection) {
   if (!collection) {
     return [];
@@ -498,6 +170,10 @@ function mapActionItemsToTasks(data) {
 
   const containers = [];
 
+  if (Array.isArray(data)) {
+    containers.push(data);
+  }
+
   const viewer = data.viewer || data.me || data.currentUser;
 
   if (viewer) {
@@ -519,7 +195,8 @@ function mapActionItemsToTasks(data) {
     data.actionItemAssignments,
     data.assignedActionItemsConnection,
     data.actionItemsConnection,
-    data.actionItemAssignmentsConnection
+    data.actionItemAssignmentsConnection,
+    data.action_items
   );
 
   const items = [];
@@ -715,21 +392,7 @@ function dedupeHeaderOptions(options) {
   });
 }
 
-function validateGraphQLPayload(payload) {
-  if (!payload || typeof payload !== "object") {
-    throw new Error("Unexpected response from Fellow.");
-  }
-
-  if (Array.isArray(payload.errors) && payload.errors.length > 0) {
-    const [firstError] = payload.errors;
-    const message = firstError?.message || "Failed to load Fellow action items.";
-    throw new Error(message);
-  }
-
-  return payload.data;
-}
-
-async function executeQuery(endpoint, token, query, variables) {
+async function fetchAssignedActionItems(baseUrl, token, limit) {
   const authHeaderOptions = buildAuthHeaderOptions(token);
 
   if (authHeaderOptions.length === 0) {
@@ -738,22 +401,40 @@ async function executeQuery(endpoint, token, query, variables) {
     throw error;
   }
 
+  const endpoint = buildUrl(baseUrl, "/api/v1/action-items");
+  const url = new URL(endpoint);
+
+  url.searchParams.set("assigned_to", "me");
+
+  if (limit) {
+    url.searchParams.set("limit", String(limit));
+  }
+
   let lastAuthError = null;
 
   for (const authHeaders of authHeaderOptions) {
-    const response = await fetch(endpoint, {
-      method: "POST",
+    const response = await fetch(url.toString(), {
+      method: "GET",
       headers: {
-        "Content-Type": "application/json",
+        Accept: "application/json",
         ...authHeaders,
       },
-      body: JSON.stringify({ query, variables }),
     });
 
-    const payload = await response.json().catch(() => null);
+    const text = await response.text();
+    let payload = null;
+
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch (error) {
+        payload = null;
+      }
+    }
 
     if (!response.ok) {
-      const message = payload?.error || payload?.message || payload?.errors?.[0]?.message;
+      const message =
+        payload?.error || payload?.message || payload?.errors?.[0]?.message || payload?.title;
       const error = new Error(message || "Failed to load Fellow action items.");
       error.status = response.status;
 
@@ -765,15 +446,14 @@ async function executeQuery(endpoint, token, query, variables) {
       throw error;
     }
 
-    return validateGraphQLPayload(payload);
+    if (!payload || typeof payload !== "object") {
+      throw new Error("Unexpected response from Fellow.");
+    }
+
+    return payload;
   }
 
   throw lastAuthError || new Error("Failed to authenticate with Fellow using the provided token.");
-}
-
-function queryUsesVariable(query, variableName) {
-  const regex = new RegExp(`\\$${variableName}\\b`);
-  return regex.test(query);
 }
 
 export default async function handler(req, res) {
@@ -785,60 +465,11 @@ export default async function handler(req, res) {
   try {
     const token = ensureConfiguredToken();
     const baseUrl = getBaseUrl();
-    const graphqlEndpoint = buildUrl(baseUrl, "/graphql");
     const limit = getLimit();
-    const assigneeId = process.env.FELLOW_ASSIGNEE_ID?.trim();
+    const data = await fetchAssignedActionItems(baseUrl, token, limit);
+    const tasks = mapActionItemsToTasks(data);
 
-    const customQuery = process.env.FELLOW_ACTIONS_QUERY?.trim();
-    const queries = customQuery ? [customQuery] : [DEFAULT_QUERY, ...FALLBACK_QUERIES];
-
-    let lastError;
-    let emptyResult = null;
-
-
-    for (const query of queries) {
-      try {
-        const variables = { first: limit };
-
-        if (queryUsesVariable(query, "assigneeId")) {
-          variables.assigneeId = assigneeId || null;
-        }
-
-        const data = await executeQuery(graphqlEndpoint, token, query, variables);
-        const tasks = mapActionItemsToTasks(data);
-
-        if (tasks.length) {
-          return res.status(200).json(tasks);
-        }
-
-        if (emptyResult === null) {
-          emptyResult = tasks;
-        }
-
-        if (customQuery) {
-
-          return res.status(200).json(tasks);
-        }
-
-        lastError = new Error("No action items were returned from Fellow.");
-      } catch (error) {
-        lastError = error;
-
-        if (customQuery) {
-          break;
-        }
-
-        if (process.env.NODE_ENV !== "production") {
-          console.warn("Fellow query attempt failed:", error.message);
-        }
-      }
-    }
-
-    if (emptyResult !== null) {
-      return res.status(200).json(emptyResult);
-    }
-
-    throw lastError || new Error("Failed to load Fellow action items.");
+    return res.status(200).json(tasks);
   } catch (error) {
     if (error.code === MISSING_CREDENTIALS_ERROR) {
       return res.status(503).json({ error: error.message });
