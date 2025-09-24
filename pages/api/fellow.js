@@ -752,7 +752,7 @@ async function requestActionItems(url, authHeaderOptions) {
         },
       });
     } catch (error) {
-      return { error };
+      return { error, shouldRetry: true };
     }
 
     const text = await response.text();
@@ -812,9 +812,13 @@ async function fetchAssignedActionItems(baseUrl, token, limit) {
   const requestUrls = buildActionItemRequestUrls(baseUrl, limit);
 
   let notFoundError = null;
+  let lastRetryableError = null;
 
   for (const requestUrl of requestUrls) {
-    const { payload, error, notFound } = await requestActionItems(requestUrl, authHeaderOptions);
+    const { payload, error, notFound, shouldRetry } = await requestActionItems(
+      requestUrl,
+      authHeaderOptions
+    );
 
     if (payload) {
       return payload;
@@ -826,6 +830,10 @@ async function fetchAssignedActionItems(baseUrl, token, limit) {
     }
 
     if (error) {
+      if (shouldRetry) {
+        lastRetryableError = error;
+        continue;
+      }
       throw error;
     }
   }
@@ -836,6 +844,10 @@ async function fetchAssignedActionItems(baseUrl, token, limit) {
     );
     enhancedError.status = 404;
     throw enhancedError;
+  }
+
+  if (lastRetryableError) {
+    throw lastRetryableError;
   }
 
   throw new Error("Failed to load Fellow action items.");
