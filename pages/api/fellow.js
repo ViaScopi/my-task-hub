@@ -117,7 +117,36 @@ function collectNodes(collection) {
 }
 
 function stripHtml(value) {
-  if (!value || typeof value !== "string") {
+  if (!value) {
+    return "";
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(stripHtml).filter(Boolean).join(" ").trim();
+  }
+
+  if (typeof value === "object") {
+    const candidates = [
+      value.html,
+      value.text,
+      value.value,
+      value.content,
+      value.description,
+      value.summary,
+    ];
+
+    for (const candidate of candidates) {
+      const normalized = stripHtml(candidate);
+
+      if (normalized) {
+        return normalized;
+      }
+    }
+
+    return "";
+  }
+
+  if (typeof value !== "string") {
     return "";
   }
 
@@ -148,19 +177,180 @@ function normalizeUrl(url) {
   return buildUrl(getBaseUrl(), relativePath);
 }
 
-function resolveContext(action, wrapper) {
-  const meeting = action?.meeting || wrapper?.meeting;
-  const stream = action?.stream || wrapper?.stream;
+const CONTEXT_LABEL_FIELDS = ["title", "name", "summary", "label"]; 
+const CONTEXT_URL_FIELDS = [
+  "url",
+  "htmlUrl",
+  "html_url",
+  "webUrl",
+  "web_url",
+  "viewUrl",
+  "view_url",
+  "browserUrl",
+  "browser_url",
+  "shareUrl",
+  "share_url",
+  "permalink",
+  "permalink_url",
+  "link",
+  "href",
+];
 
-  if (meeting?.title) {
-    return { label: `Meeting: ${meeting.title}`, url: normalizeUrl(meeting.url) };
+function resolveContext(action, wrapper) {
+  const sources = [action, wrapper].filter(Boolean);
+
+  const meeting = resolveContextEntity(
+    [
+      ...sources.map((source) => source?.meeting),
+      ...sources.map((source) =>
+        buildContextFallback(source, ["meeting", "meeting_info", "meetingDetails"], [
+          "meetingTitle",
+          "meeting_title",
+          "meetingName",
+          "meeting_name",
+        ])
+      ),
+    ]
+  );
+
+  if (meeting) {
+    return { label: `Meeting: ${meeting.label}`, url: normalizeUrl(meeting.url) };
   }
 
-  if (stream?.name) {
-    return { label: `Stream: ${stream.name}`, url: normalizeUrl(stream.url) };
+  const stream = resolveContextEntity(
+    [
+      ...sources.map((source) => source?.stream),
+      ...sources.map((source) =>
+        buildContextFallback(source, ["stream", "stream_info", "streamDetails"], [
+          "streamTitle",
+          "stream_title",
+          "streamName",
+          "stream_name",
+        ])
+      ),
+    ]
+  );
+
+  if (stream) {
+    return { label: `Stream: ${stream.label}`, url: normalizeUrl(stream.url) };
   }
 
   return { label: "Fellow", url: "" };
+}
+
+function buildContextFallback(source, objectKeys, valueKeys) {
+  if (!source || typeof source !== "object") {
+    return null;
+  }
+
+  for (const objectKey of objectKeys) {
+    const nested = source[objectKey];
+
+    if (nested && typeof nested === "object") {
+      return nested;
+    }
+  }
+
+  const label = valueKeys
+    .map((key) => source[key])
+    .find((value) => typeof value === "string" && value.trim());
+
+  const url = CONTEXT_URL_FIELDS.map((key) => source[key])
+    .concat(extractLinks(source))
+    .find((value) => typeof value === "string" && value.trim());
+
+  if (!label && !url) {
+    return null;
+  }
+
+  return { label, url };
+}
+
+function resolveContextEntity(candidates) {
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== "object") {
+      continue;
+    }
+
+    const label = CONTEXT_LABEL_FIELDS
+      .map((field) => candidate[field])
+      .find((value) => typeof value === "string" && value.trim());
+
+    const url = CONTEXT_URL_FIELDS.map((field) => candidate[field])
+      .concat(extractLinks(candidate))
+      .find((value) => typeof value === "string" && value.trim());
+
+    if (label) {
+      return { label: label.trim(), url: url || "" };
+    }
+  }
+
+  return null;
+}
+
+function extractLinks(source) {
+  if (!source || typeof source !== "object") {
+    return [];
+  }
+
+  const links = source.links;
+
+  if (!links || typeof links !== "object") {
+    return [];
+  }
+
+  return Object.values(links).filter((value) => typeof value === "string");
+}
+
+const ITEM_URL_FIELDS = [
+  "url",
+  "webUrl",
+  "web_url",
+  "htmlUrl",
+  "html_url",
+  "viewUrl",
+  "view_url",
+  "browserUrl",
+  "browser_url",
+  "shareUrl",
+  "share_url",
+  "permalink",
+  "permalink_url",
+  "appUrl",
+  "app_url",
+  "link",
+  "href",
+];
+
+function collectItemUrlCandidates(...sources) {
+  const urls = [];
+
+  for (const source of sources) {
+    if (!source) {
+      continue;
+    }
+
+    if (typeof source === "string") {
+      urls.push(source);
+      continue;
+    }
+
+    if (typeof source !== "object") {
+      continue;
+    }
+
+    for (const field of ITEM_URL_FIELDS) {
+      const value = source[field];
+
+      if (typeof value === "string") {
+        urls.push(value);
+      }
+    }
+
+    urls.push(...extractLinks(source));
+  }
+
+  return urls;
 }
 
 function mapActionItemsToTasks(data) {
@@ -196,8 +386,12 @@ function mapActionItemsToTasks(data) {
     data.assignedActionItemsConnection,
     data.actionItemsConnection,
     data.actionItemAssignmentsConnection,
-    data.action_items
+    data.action_items,
+    data.items,
+    data.results
   );
+
+  collectRestActionItemContainers(data, containers);
 
   const items = [];
   const seen = new Set();
@@ -219,19 +413,47 @@ function mapActionItemsToTasks(data) {
 
   return items.map(({ action, wrapper }) => {
     const context = resolveContext(action, wrapper);
-    const title = action?.content?.trim() || action?.title?.trim() || "Untitled action item";
+    const title =
+      action?.content?.trim() ||
+      action?.title?.trim() ||
+      stripHtml(action?.summary) ||
+      stripHtml(action?.description) ||
+      "Untitled action item";
     const description =
       stripHtml(action?.htmlContent) ||
+      stripHtml(action?.html_content) ||
       stripHtml(wrapper?.htmlContent) ||
+      stripHtml(wrapper?.html_content) ||
+      stripHtml(action?.description_html) ||
+      stripHtml(wrapper?.description_html) ||
+      stripHtml(action?.description) ||
+      stripHtml(wrapper?.description) ||
+      stripHtml(action?.summary_html) ||
+      stripHtml(wrapper?.summary_html) ||
+      stripHtml(action?.summary) ||
+      stripHtml(wrapper?.summary) ||
       action?.summary?.trim() ||
       action?.notes?.trim() ||
       action?.content?.trim() ||
       "";
 
-    const dueDate = action?.dueDate || action?.due || wrapper?.dueDate || wrapper?.due || null;
+    const dueDate =
+      action?.dueDate ||
+      action?.due_date ||
+      action?.due ||
+      action?.due_on ||
+      wrapper?.dueDate ||
+      wrapper?.due_date ||
+      wrapper?.due ||
+      wrapper?.due_on ||
+      null;
     const status = action?.status || wrapper?.status || null;
 
-    const candidateUrls = [action?.url, wrapper?.url, context.url];
+    const candidateUrls = [
+      ...collectItemUrlCandidates(action, wrapper),
+      context.url,
+    ];
+
     const normalizedUrl = candidateUrls.map(normalizeUrl).find(Boolean) || getBaseUrl();
 
     return {
@@ -245,6 +467,43 @@ function mapActionItemsToTasks(data) {
       status,
     };
   });
+}
+
+function collectRestActionItemContainers(data, containers) {
+  const queue = [];
+  const visited = new Set();
+
+  if (data && typeof data === "object") {
+    queue.push(data);
+  }
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+
+    if (!current || typeof current !== "object" || visited.has(current)) {
+      continue;
+    }
+
+    visited.add(current);
+
+    for (const key of ["action_items", "actionItems", "items", "results", "data"]) {
+      if (!(key in current)) {
+        continue;
+      }
+
+      const value = current[key];
+
+      if (!value) {
+        continue;
+      }
+
+      if (Array.isArray(value)) {
+        containers.push(value);
+      } else if (typeof value === "object") {
+        queue.push(value);
+      }
+    }
+  }
 }
 
 const AUTH_HEADER_PREFIX_PATTERN = /^(Bearer|Token|Basic)\s/i;
@@ -494,3 +753,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: error.message || "Failed to load Fellow action items." });
   }
 }
+
+export { mapActionItemsToTasks, resolveContext, stripHtml, normalizeUrl };
