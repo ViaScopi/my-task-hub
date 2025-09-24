@@ -5,20 +5,22 @@ const { fetchAssignedActionItems, mapActionItemsToTasks } = require("../fellow.j
 
 test("maps REST action items payload", () => {
   const payload = {
-    action_items: [
+    notes: [
       {
-        id: "123",
-        content: "Follow up with the team",
-        description: "<p>Ensure blockers are resolved</p>",
-        summary: "Ensure blockers are resolved",
-        html_content: "<p>Ensure blockers are resolved</p>",
-        due_date: "2025-01-02",
-        status: "open",
-        url: "/action-items/123",
-        meeting: {
-          title: "Weekly Sync",
-          url: "/meetings/weekly-sync",
-        },
+        note_title: "Weekly Sync",
+        note_url: "/notes/weekly-sync",
+        action_items: [
+          {
+            id: "123",
+            content: "Follow up with the team",
+            description: "<p>Ensure blockers are resolved</p>",
+            summary: "Ensure blockers are resolved",
+            html_content: "<p>Ensure blockers are resolved</p>",
+            due_date: "2025-01-02",
+            status: "open",
+            url: "/action-items/123",
+          },
+        ],
       },
     ],
   };
@@ -34,30 +36,47 @@ test("maps REST action items payload", () => {
   assert.equal(task.description, "Ensure blockers are resolved");
   assert.equal(task.dueDate, "2025-01-02");
   assert.equal(task.status, "open");
-  assert.equal(task.repo, "Meeting: Weekly Sync");
+  assert.equal(task.repo, "Note: Weekly Sync");
   assert.equal(task.url, "https://fellow.app/action-items/123");
 });
 
 test("dedupes duplicate REST containers and preserves stream context", () => {
   const payload = {
-    action_items: [
-      { id: "a-1", content: "First" },
-      { id: "a-2", content: "Second" },
-    ],
-    items: [
-      { id: "a-2", content: "Second duplicate" },
-      {
-        id: "a-3",
-        content: "Third",
-        stream: {
-          name: "Product Roadmap",
-          url: "/streams/roadmap",
+    data: {
+      notes: [
+        {
+          note_title: "Planning",
+          action_items: [
+            { id: "a-1", content: "First duplicate" },
+            { id: "a-4", content: "Fourth" },
+          ],
         },
+      ],
+    },
+    notes: [
+      {
+        note_title: "Weekly Sync",
+        action_items: [
+          { id: "a-1", content: "First" },
+          { id: "a-2", content: "Second" },
+        ],
+      },
+      {
+        note_title: "Product Roadmap",
+        note_url: "/streams/roadmap",
+        actionItems: [
+          { id: "a-2", content: "Second duplicate" },
+          {
+            id: "a-3",
+            content: "Third",
+            stream: {
+              name: "Product Roadmap",
+              url: "/streams/roadmap",
+            },
+          },
+        ],
       },
     ],
-    data: {
-      action_items: [{ id: "a-1", content: "First duplicate" }, { id: "a-4", content: "Fourth" }],
-    },
   };
 
   const tasks = mapActionItemsToTasks(payload);
@@ -158,18 +177,23 @@ test("fetchAssignedActionItems falls back to API subdomain and v1 route", async 
   }
 
   assert.equal(requests.length, 9);
-  assert.match(requests[0].url, /https:\/\/fellow\.app\/api\/v1\/action-items/);
-  assert.match(requests[1].url, /https:\/\/fellow\.app\/v1\/action-items/);
-  assert.match(requests[2].url, /https:\/\/fellow\.app\/api\/v1\/action_items/);
-  assert.match(requests[3].url, /https:\/\/fellow\.app\/v1\/action_items/);
-  assert.match(requests[4].url, /https:\/\/api\.fellow\.app\/api\/v1\/action-items/);
-  assert.match(requests[5].url, /https:\/\/api\.fellow\.app\/v1\/action-items/);
-  assert.match(requests[6].url, /https:\/\/api\.fellow\.app\/api\/v1\/action_items/);
-  assert.match(requests[7].url, /https:\/\/api\.fellow\.app\/v1\/action_items/);
+  assert.match(requests[0].url, /https:\/\/fellow\.app\/apps\/api\/v1\/notes\/list/);
+  assert.match(requests[1].url, /https:\/\/fellow\.app\/api\/v1\/notes\/list/);
+  assert.match(requests[2].url, /https:\/\/fellow\.app\/apps\/v1\/notes\/list/);
+  assert.match(requests[3].url, /https:\/\/fellow\.app\/v1\/notes\/list/);
+  assert.match(requests[4].url, /https:\/\/api\.fellow\.app\/apps\/api\/v1\/notes\/list/);
+  assert.match(requests[5].url, /https:\/\/api\.fellow\.app\/api\/v1\/notes\/list/);
+  assert.match(requests[6].url, /https:\/\/api\.fellow\.app\/apps\/v1\/notes\/list/);
+  assert.match(requests[7].url, /https:\/\/api\.fellow\.app\/v1\/notes\/list/);
 
-  const lastRestUrl = new URL(requests[7].url);
-  assert.equal(lastRestUrl.searchParams.get("assigned_to"), "me");
-  assert.equal(lastRestUrl.searchParams.get("limit"), "25");
+  for (let i = 0; i < 8; i += 1) {
+    assert.equal(requests[i].options.method, "POST");
+    const body = JSON.parse(requests[i].options.body);
+    assert.equal(body.include.action_items, true);
+    assert.equal(body.filters.note_filters.action_item_assignee, "me");
+    assert.equal(body.filters.note_filters.action_item_status, "open");
+    assert.equal(body.page_size, 25);
+  }
 
   assert.equal(requests[requests.length - 1].options.method, "POST");
   const body = JSON.parse(requests[requests.length - 1].options.body);
@@ -184,7 +208,7 @@ test("fetchAssignedActionItems returns GraphQL payload when REST endpoints missi
   global.fetch = async (url, options = {}) => {
     calls.push({ url, options });
 
-    if (options.method === "GET" || !options.method) {
+    if (/notes\/list/.test(url)) {
       return {
         ok: false,
         status: 404,

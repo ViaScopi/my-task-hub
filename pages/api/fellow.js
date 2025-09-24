@@ -496,19 +496,20 @@ function collectRestActionItemContainers(data, containers) {
   const visited = new Set();
 
   if (data && typeof data === "object") {
-    queue.push(data);
+    queue.push({ node: data, note: null });
   }
 
   while (queue.length > 0) {
-    const current = queue.shift();
+    const { node: current, note: currentNote } = queue.shift();
 
     if (!current || typeof current !== "object" || visited.has(current)) {
       continue;
     }
 
     visited.add(current);
+    const processedArrays = new Set();
 
-    for (const key of ["action_items", "actionItems", "items", "results", "data"]) {
+    for (const key of ["notes", "action_items", "actionItems", "items", "results", "data"]) {
       if (!(key in current)) {
         continue;
       }
@@ -519,13 +520,171 @@ function collectRestActionItemContainers(data, containers) {
         continue;
       }
 
+      if (key === "notes") {
+        const noteCandidates = Array.isArray(value) ? value : [value];
+
+        for (const note of noteCandidates) {
+          if (!note || typeof note !== "object") {
+            continue;
+          }
+
+          queue.push({ node: note, note });
+        }
+
+        continue;
+      }
+
+      if (key === "action_items" || key === "actionItems") {
+        if (Array.isArray(value)) {
+          if (processedArrays.has(value)) {
+            continue;
+          }
+
+          processedArrays.add(value);
+          containers.push(value.map((item) => enrichActionItemWithNoteContext(item, currentNote)));
+        } else if (typeof value === "object") {
+          queue.push({ node: value, note: currentNote });
+        }
+
+        continue;
+      }
+
       if (Array.isArray(value)) {
-        containers.push(value);
+        if (processedArrays.has(value)) {
+          continue;
+        }
+
+        processedArrays.add(value);
+        containers.push(value.map((item) => enrichActionItemWithNoteContext(item, currentNote)));
+
+        for (const item of value) {
+          if (item && typeof item === "object") {
+            queue.push({ node: item, note: currentNote });
+          }
+        }
       } else if (typeof value === "object") {
-        queue.push(value);
+        queue.push({ node: value, note: currentNote });
       }
     }
   }
+}
+
+function enrichActionItemWithNoteContext(action, note) {
+  if (!action || typeof action !== "object" || !note || typeof note !== "object") {
+    return action;
+  }
+
+  const hasMeeting = Boolean(
+    action.meeting ||
+      action.meeting_info ||
+      action.meetingDetails ||
+      action.meetingTitle ||
+      action.meeting_title
+  );
+  const hasStream = Boolean(
+    action.stream ||
+      action.stream_info ||
+      action.streamDetails ||
+      action.streamTitle ||
+      action.stream_title
+  );
+
+  const noteContext = buildNoteContext(note);
+
+  if (!noteContext && hasMeeting && hasStream) {
+    return action;
+  }
+
+  const enriched = { ...action };
+
+  if (noteContext && (!enriched.note || typeof enriched.note !== "object")) {
+    enriched.note = noteContext;
+  }
+
+  if (!hasMeeting) {
+    const meetingContext = buildContextFallback(
+      note,
+      ["meeting", "meeting_info", "meetingDetails"],
+      ["meetingTitle", "meeting_title", "meetingName", "meeting_name"]
+    );
+
+    if (meetingContext) {
+      enriched.meeting = meetingContext;
+    }
+  }
+
+  if (!hasStream) {
+    const streamContext = buildContextFallback(
+      note,
+      ["stream", "stream_info", "streamDetails"],
+      ["streamTitle", "stream_title", "streamName", "stream_name"]
+    );
+
+    if (streamContext) {
+      enriched.stream = streamContext;
+    }
+  }
+
+  return enriched;
+}
+
+function buildNoteContext(note) {
+  if (!note || typeof note !== "object") {
+    return null;
+  }
+
+  const directContext = buildContextFallback(
+    note,
+    ["note", "note_info", "noteDetails"],
+    ["noteTitle", "note_title", "noteName", "note_name", "title", "name"]
+  );
+
+  if (directContext) {
+    const context = {};
+
+    if (directContext.label) {
+      context.title = directContext.label;
+      context.label = directContext.label;
+    }
+
+    if (directContext.url) {
+      context.url = directContext.url;
+    }
+
+    return context;
+  }
+
+  const labelCandidate = [
+    note.title,
+    note.name,
+    note.subject,
+    note.noteTitle,
+    note.note_title,
+    note.noteName,
+    note.note_name,
+  ].find((value) => typeof value === "string" && value.trim());
+
+  const urlCandidate = CONTEXT_URL_FIELDS.map((field) => note[field])
+    .concat([note.noteUrl, note.note_url])
+    .find((value) => typeof value === "string" && value.trim());
+
+  if (!labelCandidate && !urlCandidate) {
+    return null;
+  }
+
+  const context = {};
+
+  if (labelCandidate) {
+    const trimmed = labelCandidate.trim();
+    context.title = trimmed;
+    context.label = trimmed;
+  }
+
+  if (urlCandidate) {
+    context.url = urlCandidate;
+  }
+
+  return context;
 }
 
 const AUTH_HEADER_PREFIX_PATTERN = /^(Bearer|Token|Basic)\s/i;
@@ -673,7 +832,7 @@ function dedupeHeaderOptions(options) {
   });
 }
 
-function buildActionItemBaseCandidates(baseUrl) {
+function buildNotesBaseCandidates(baseUrl) {
   const candidates = [];
   const seen = new Set();
 
@@ -720,13 +879,13 @@ function buildActionItemBaseCandidates(baseUrl) {
   return candidates;
 }
 
-function buildActionItemEndpointCandidates(baseUrl) {
-  const baseCandidates = buildActionItemBaseCandidates(baseUrl);
+function buildNotesEndpointCandidates(baseUrl) {
+  const baseCandidates = buildNotesBaseCandidates(baseUrl);
   const pathCandidates = [
-    "/api/v1/action-items",
-    "/v1/action-items",
-    "/api/v1/action_items",
-    "/v1/action_items",
+    "/apps/api/v1/notes/list",
+    "/api/v1/notes/list",
+    "/apps/v1/notes/list",
+    "/v1/notes/list",
   ];
   const endpoints = [];
   const seen = new Set();
@@ -748,20 +907,34 @@ function buildActionItemEndpointCandidates(baseUrl) {
   return endpoints;
 }
 
-function buildActionItemRequestUrls(baseUrl, limit) {
-  const endpoints = buildActionItemEndpointCandidates(baseUrl);
+function buildNotesRequestConfigs(baseUrl, limit) {
+  const endpoints = buildNotesEndpointCandidates(baseUrl);
+  const body = buildNotesRequestBody(limit);
 
-  return endpoints.map((endpoint) => {
-    const url = new URL(endpoint);
+  return endpoints.map((endpoint) => ({
+    url: endpoint,
+    body,
+  }));
+}
 
-    url.searchParams.set("assigned_to", "me");
+function buildNotesRequestBody(limit) {
+  const payload = {
+    include: {
+      action_items: true,
+    },
+    filters: {
+      note_filters: {
+        action_item_assignee: "me",
+        action_item_status: "open",
+      },
+    },
+  };
 
-    if (Number.isFinite(limit) && limit > 0) {
-      url.searchParams.set("limit", String(limit));
-    }
+  if (Number.isFinite(limit) && limit > 0) {
+    payload.page_size = Math.min(Math.max(limit, 1), 200);
+  }
 
-    return url.toString();
-  });
+  return JSON.stringify(payload);
 }
 
 const GRAPHQL_ACTION_ITEMS_QUERY = `
@@ -894,7 +1067,7 @@ async function fetchAssignedActionItemsViaGraphql(baseUrl, authHeaderOptions, li
   throw authError;
 }
 
-async function requestActionItems(url, authHeaderOptions) {
+async function requestNotes({ url, body }, authHeaderOptions) {
   let lastAuthError = null;
 
   for (const authHeaders of authHeaderOptions) {
@@ -902,11 +1075,13 @@ async function requestActionItems(url, authHeaderOptions) {
 
     try {
       response = await fetch(url, {
-        method: "GET",
+        method: "POST",
         headers: {
           Accept: "application/json",
+          "Content-Type": "application/json",
           ...authHeaders,
         },
+        body,
       });
     } catch (error) {
       return { error, shouldRetry: true };
@@ -966,14 +1141,14 @@ async function fetchAssignedActionItems(baseUrl, token, limit) {
     throw error;
   }
 
-  const requestUrls = buildActionItemRequestUrls(baseUrl, limit);
+  const requestConfigs = buildNotesRequestConfigs(baseUrl, limit);
 
   let notFoundError = null;
   let lastRetryableError = null;
 
-  for (const requestUrl of requestUrls) {
-    const { payload, error, notFound, shouldRetry } = await requestActionItems(
-      requestUrl,
+  for (const requestConfig of requestConfigs) {
+    const { payload, error, notFound, shouldRetry } = await requestNotes(
+      requestConfig,
       authHeaderOptions
     );
 
