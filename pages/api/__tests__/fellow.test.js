@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { mapActionItemsToTasks } = require("../fellow.js");
+const { fetchAssignedActionItems, mapActionItemsToTasks } = require("../fellow.js");
 
 test("maps REST action items payload", () => {
   const payload = {
@@ -69,4 +69,48 @@ test("dedupes duplicate REST containers and preserves stream context", () => {
   assert(streamTask, "Expected to find stream task");
   assert.equal(streamTask.repo, "Stream: Product Roadmap");
   assert.equal(streamTask.url, "https://fellow.app/streams/roadmap");
+});
+
+test("fetchAssignedActionItems falls back to API subdomain and v1 route", async () => {
+  const requests = [];
+  const originalFetch = global.fetch;
+
+  global.fetch = async (url) => {
+    requests.push(url);
+
+    if (requests.length < 4) {
+      return {
+        ok: false,
+        status: 404,
+        text: async () => JSON.stringify({ message: "Not found" }),
+      };
+    }
+
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ action_items: [] }),
+    };
+  };
+
+  try {
+    const payload = await fetchAssignedActionItems("https://fellow.app", "test-token", 25);
+    assert.deepEqual(payload, { action_items: [] });
+  } finally {
+    if (originalFetch === undefined) {
+      delete global.fetch;
+    } else {
+      global.fetch = originalFetch;
+    }
+  }
+
+  assert.equal(requests.length, 4);
+  assert.match(requests[0], /https:\/\/fellow\.app\/api\/v1\/action-items/);
+  assert.match(requests[1], /https:\/\/fellow\.app\/v1\/action-items/);
+  assert.match(requests[2], /https:\/\/api\.fellow\.app\/api\/v1\/action-items/);
+  assert.match(requests[3], /https:\/\/api\.fellow\.app\/v1\/action-items/);
+
+  const finalUrl = new URL(requests[requests.length - 1]);
+  assert.equal(finalUrl.searchParams.get("assigned_to"), "me");
+  assert.equal(finalUrl.searchParams.get("limit"), "25");
 });

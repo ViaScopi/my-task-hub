@@ -651,34 +651,109 @@ function dedupeHeaderOptions(options) {
   });
 }
 
-async function fetchAssignedActionItems(baseUrl, token, limit) {
-  const authHeaderOptions = buildAuthHeaderOptions(token);
+function buildActionItemBaseCandidates(baseUrl) {
+  const candidates = [];
+  const seen = new Set();
 
-  if (authHeaderOptions.length === 0) {
-    const error = new Error("Fellow API token is missing.");
-    error.status = 401;
-    throw error;
+  function addCandidate(candidate) {
+    if (!candidate) {
+      return;
+    }
+
+    const normalizedCandidate = ensureBaseUrl(candidate);
+
+    if (seen.has(normalizedCandidate)) {
+      return;
+    }
+
+    seen.add(normalizedCandidate);
+    candidates.push(normalizedCandidate);
   }
 
-  const endpoint = buildUrl(baseUrl, "/api/v1/action-items");
-  const url = new URL(endpoint);
+  const normalizedBaseUrl = ensureBaseUrl(baseUrl);
+  addCandidate(normalizedBaseUrl);
 
-  url.searchParams.set("assigned_to", "me");
+  try {
+    const parsed = new URL(normalizedBaseUrl);
+    const protocol = parsed.protocol || "https:";
+    const pathname = parsed.pathname && parsed.pathname !== "/" ? parsed.pathname : "";
+    const port = parsed.port ? `:${parsed.port}` : "";
+    const hostLower = parsed.hostname.toLowerCase();
 
-  if (limit) {
-    url.searchParams.set("limit", String(limit));
+    if (!hostLower.startsWith("api.")) {
+      addCandidate(`${protocol}//api.${parsed.hostname}${port}${pathname}`);
+    }
+
+    if (hostLower === "fellow.app" || hostLower.endsWith(".fellow.app")) {
+      addCandidate(`${protocol}//api.fellow.app${port}${pathname}`);
+    }
+
+    if (hostLower === "fellow.ai" || hostLower.endsWith(".fellow.ai")) {
+      addCandidate(`${protocol}//api.fellow.ai${port}${pathname}`);
+    }
+  } catch (error) {
+    // Ignore parsing failures and rely on the normalized base URL.
   }
 
+  return candidates;
+}
+
+function buildActionItemEndpointCandidates(baseUrl) {
+  const baseCandidates = buildActionItemBaseCandidates(baseUrl);
+  const pathCandidates = ["/api/v1/action-items", "/v1/action-items"];
+  const endpoints = [];
+  const seen = new Set();
+
+  for (const baseCandidate of baseCandidates) {
+    for (const pathCandidate of pathCandidates) {
+      const endpoint = buildUrl(baseCandidate, pathCandidate);
+      const key = endpoint.toLowerCase();
+
+      if (seen.has(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      endpoints.push(endpoint);
+    }
+  }
+
+  return endpoints;
+}
+
+function buildActionItemRequestUrls(baseUrl, limit) {
+  const endpoints = buildActionItemEndpointCandidates(baseUrl);
+
+  return endpoints.map((endpoint) => {
+    const url = new URL(endpoint);
+
+    url.searchParams.set("assigned_to", "me");
+
+    if (Number.isFinite(limit) && limit > 0) {
+      url.searchParams.set("limit", String(limit));
+    }
+
+    return url.toString();
+  });
+}
+
+async function requestActionItems(url, authHeaderOptions) {
   let lastAuthError = null;
 
   for (const authHeaders of authHeaderOptions) {
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        ...authHeaders,
-      },
-    });
+    let response;
+
+    try {
+      response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          ...authHeaders,
+        },
+      });
+    } catch (error) {
+      return { error };
+    }
 
     const text = await response.text();
     let payload = null;
@@ -691,28 +766,79 @@ async function fetchAssignedActionItems(baseUrl, token, limit) {
       }
     }
 
-    if (!response.ok) {
-      const message =
-        payload?.error || payload?.message || payload?.errors?.[0]?.message || payload?.title;
-      const error = new Error(message || "Failed to load Fellow action items.");
-      error.status = response.status;
-
-      if ((response.status === 401 || response.status === 403) && authHeaderOptions.length > 1) {
-        lastAuthError = error;
-        continue;
+    if (response.ok) {
+      if (!payload || typeof payload !== "object") {
+        return { error: new Error("Unexpected response from Fellow.") };
       }
 
-      throw error;
+      return { payload };
     }
 
-    if (!payload || typeof payload !== "object") {
-      throw new Error("Unexpected response from Fellow.");
+    const message =
+      payload?.error || payload?.message || payload?.errors?.[0]?.message || payload?.title;
+    const error = new Error(message || "Failed to load Fellow action items.");
+    error.status = response.status;
+
+    if ((response.status === 401 || response.status === 403) && authHeaderOptions.length > 1) {
+      lastAuthError = error;
+      continue;
     }
 
-    return payload;
+    if (response.status === 404) {
+      return { error, notFound: true };
+    }
+
+    return { error };
   }
 
-  throw lastAuthError || new Error("Failed to authenticate with Fellow using the provided token.");
+  if (lastAuthError) {
+    return { error: lastAuthError };
+  }
+
+  const authError = new Error("Failed to authenticate with Fellow using the provided token.");
+  authError.status = 401;
+  return { error: authError };
+}
+
+async function fetchAssignedActionItems(baseUrl, token, limit) {
+  const authHeaderOptions = buildAuthHeaderOptions(token);
+
+  if (authHeaderOptions.length === 0) {
+    const error = new Error("Fellow API token is missing.");
+    error.status = 401;
+    throw error;
+  }
+
+  const requestUrls = buildActionItemRequestUrls(baseUrl, limit);
+
+  let notFoundError = null;
+
+  for (const requestUrl of requestUrls) {
+    const { payload, error, notFound } = await requestActionItems(requestUrl, authHeaderOptions);
+
+    if (payload) {
+      return payload;
+    }
+
+    if (notFound) {
+      notFoundError = error;
+      continue;
+    }
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (notFoundError) {
+    const enhancedError = new Error(
+      "Fellow action items endpoint was not found. Please verify the configured FELLOW_API_BASE_URL matches the REST API host (for example, https://api.fellow.app)."
+    );
+    enhancedError.status = 404;
+    throw enhancedError;
+  }
+
+  throw new Error("Failed to load Fellow action items.");
 }
 
 export default async function handler(req, res) {
@@ -754,4 +880,10 @@ export default async function handler(req, res) {
   }
 }
 
-export { mapActionItemsToTasks, resolveContext, stripHtml, normalizeUrl };
+export {
+  mapActionItemsToTasks,
+  resolveContext,
+  stripHtml,
+  normalizeUrl,
+  fetchAssignedActionItems,
+};
