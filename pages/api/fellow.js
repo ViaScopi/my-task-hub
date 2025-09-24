@@ -1,48 +1,64 @@
-const DEFAULT_ENDPOINT = "https://fellow.app/graphql";
+const DEFAULT_BASE_URL = "https://fellow.app";
 const DEFAULT_LIMIT = 100;
 
 const MISSING_CREDENTIALS_ERROR = "MISSING_FELLOW_CREDENTIALS";
 
-function getEndpoint() {
-  const rawEndpoint = process.env.FELLOW_GRAPHQL_ENDPOINT?.trim();
+function getBaseUrl() {
+  const rawBaseUrl =
+    process.env.FELLOW_API_BASE_URL?.trim() ?? process.env.FELLOW_GRAPHQL_ENDPOINT?.trim();
 
-  if (!rawEndpoint) {
-    return DEFAULT_ENDPOINT;
-  }
-
-  return ensureGraphQLEndpoint(rawEndpoint);
+  return ensureBaseUrl(rawBaseUrl);
 }
 
-function ensureGraphQLEndpoint(rawEndpoint) {
-  let normalizedEndpoint = rawEndpoint.trim();
+function ensureBaseUrl(rawBaseUrl) {
+  let normalizedBaseUrl = rawBaseUrl?.trim();
 
-  if (!normalizedEndpoint) {
-    return DEFAULT_ENDPOINT;
+  if (!normalizedBaseUrl) {
+    normalizedBaseUrl = DEFAULT_BASE_URL;
   }
 
-  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(normalizedEndpoint)) {
-    normalizedEndpoint = `https://${normalizedEndpoint}`;
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(normalizedBaseUrl)) {
+    normalizedBaseUrl = `https://${normalizedBaseUrl}`;
   }
-
-  const GRAPHQL_PATH_PATTERN = /(^|\/)graphql(\?|#|\/|$)/i;
 
   try {
-    const endpointUrl = new URL(normalizedEndpoint);
+    const baseUrl = new URL(normalizedBaseUrl);
 
-    if (!GRAPHQL_PATH_PATTERN.test(endpointUrl.pathname)) {
-      const trimmedPath = endpointUrl.pathname.replace(/\/+$/, "");
-      const segments = trimmedPath.split("/").filter(Boolean);
-      segments.push("graphql");
-      endpointUrl.pathname = `/${segments.join("/")}`;
+    baseUrl.search = "";
+    baseUrl.hash = "";
+
+    let pathname = baseUrl.pathname.replace(/\/+$/, "");
+
+    if (!pathname) {
+      pathname = "/";
     }
 
-    return endpointUrl.toString();
+    baseUrl.pathname = pathname;
+
+    return baseUrl.toString().replace(/\/+$/, "");
   } catch (error) {
-    if (GRAPHQL_PATH_PATTERN.test(normalizedEndpoint)) {
-      return normalizedEndpoint;
-    }
+    return normalizedBaseUrl.replace(/\/+$/, "");
+  }
+}
 
-    return `${normalizedEndpoint.replace(/\/+$/, "")}/graphql`;
+function buildUrl(baseUrl, path) {
+  const normalizedBaseUrl = ensureBaseUrl(baseUrl);
+
+  if (!path) {
+    return normalizedBaseUrl;
+  }
+
+  try {
+    const baseForUrl = normalizedBaseUrl.endsWith("/")
+      ? normalizedBaseUrl
+      : `${normalizedBaseUrl}/`;
+
+    return new URL(path, baseForUrl).toString();
+  } catch (error) {
+    const trimmedBase = normalizedBaseUrl.replace(/\/+$/, "");
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+    return `${trimmedBase}${normalizedPath}`;
   }
 }
 
@@ -455,7 +471,9 @@ function normalizeUrl(url) {
     return trimmed;
   }
 
-  return `https://fellow.app${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
+  const relativePath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+
+  return buildUrl(getBaseUrl(), relativePath);
 }
 
 function resolveContext(action, wrapper) {
@@ -537,7 +555,7 @@ function mapActionItemsToTasks(data) {
     const status = action?.status || wrapper?.status || null;
 
     const candidateUrls = [action?.url, wrapper?.url, context.url];
-    const normalizedUrl = candidateUrls.map(normalizeUrl).find(Boolean) || "https://fellow.app";
+    const normalizedUrl = candidateUrls.map(normalizeUrl).find(Boolean) || getBaseUrl();
 
     return {
       id: `fellow-${action.id}`,
@@ -766,7 +784,8 @@ export default async function handler(req, res) {
 
   try {
     const token = ensureConfiguredToken();
-    const endpoint = getEndpoint();
+    const baseUrl = getBaseUrl();
+    const graphqlEndpoint = buildUrl(baseUrl, "/graphql");
     const limit = getLimit();
     const assigneeId = process.env.FELLOW_ASSIGNEE_ID?.trim();
 
@@ -785,7 +804,7 @@ export default async function handler(req, res) {
           variables.assigneeId = assigneeId || null;
         }
 
-        const data = await executeQuery(endpoint, token, query, variables);
+        const data = await executeQuery(graphqlEndpoint, token, query, variables);
         const tasks = mapActionItemsToTasks(data);
 
         if (tasks.length) {
