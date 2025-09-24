@@ -62,6 +62,10 @@ function buildUrl(baseUrl, path) {
   }
 }
 
+function buildGraphqlUrl(baseUrl) {
+  return buildUrl(baseUrl, "/graphql");
+}
+
 function getLimit() {
   const rawLimit = process.env.FELLOW_ACTIONS_LIMIT;
 
@@ -233,6 +237,24 @@ function resolveContext(action, wrapper) {
 
   if (stream) {
     return { label: `Stream: ${stream.label}`, url: normalizeUrl(stream.url) };
+  }
+
+  const note = resolveContextEntity(
+    [
+      ...sources.map((source) => source?.note),
+      ...sources.map((source) =>
+        buildContextFallback(source, ["note", "note_info", "noteDetails"], [
+          "noteTitle",
+          "note_title",
+          "noteName",
+          "note_name",
+        ])
+      ),
+    ]
+  );
+
+  if (note) {
+    return { label: `Note: ${note.label}`, url: normalizeUrl(note.url) };
   }
 
   return { label: "Fellow", url: "" };
@@ -700,7 +722,12 @@ function buildActionItemBaseCandidates(baseUrl) {
 
 function buildActionItemEndpointCandidates(baseUrl) {
   const baseCandidates = buildActionItemBaseCandidates(baseUrl);
-  const pathCandidates = ["/api/v1/action-items", "/v1/action-items"];
+  const pathCandidates = [
+    "/api/v1/action-items",
+    "/v1/action-items",
+    "/api/v1/action_items",
+    "/v1/action_items",
+  ];
   const endpoints = [];
   const seen = new Set();
 
@@ -735,6 +762,136 @@ function buildActionItemRequestUrls(baseUrl, limit) {
 
     return url.toString();
   });
+}
+
+const GRAPHQL_ACTION_ITEMS_QUERY = `
+  query AssignedActionItems($first: Int) {
+    viewer {
+      assignedActionItems(first: $first) {
+        edges {
+          node {
+            id
+            content
+            title
+            description
+            dueDate
+            status
+            url
+            htmlUrl
+            webUrl
+            note {
+              title
+              url
+            }
+            stream {
+              name
+              url
+            }
+            meeting {
+              title
+              url
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+async function fetchAssignedActionItemsViaGraphql(baseUrl, authHeaderOptions, limit) {
+  const graphqlUrl = buildGraphqlUrl(baseUrl);
+  const variables = {};
+
+  if (Number.isFinite(limit) && limit > 0) {
+    variables.first = limit;
+  }
+
+  const body = JSON.stringify({
+    query: GRAPHQL_ACTION_ITEMS_QUERY,
+    variables,
+  });
+
+  let lastAuthError = null;
+  let lastError = null;
+
+  for (const authHeaders of authHeaderOptions) {
+    let response;
+
+    try {
+      response = await fetch(graphqlUrl, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          ...authHeaders,
+        },
+        body,
+      });
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
+
+    const text = await response.text();
+    let payload = null;
+
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch (error) {
+        payload = null;
+      }
+    }
+
+    if (!response.ok) {
+      const message =
+        payload?.error ||
+        payload?.message ||
+        payload?.errors?.[0]?.message ||
+        payload?.title ||
+        "Failed to load Fellow action items.";
+      const error = new Error(message);
+      error.status = response.status;
+
+      if ((response.status === 401 || response.status === 403) && authHeaderOptions.length > 1) {
+        lastAuthError = error;
+        continue;
+      }
+
+      throw error;
+    }
+
+    if (payload?.errors?.length) {
+      const message = payload.errors.map((err) => err?.message).filter(Boolean).join("; ");
+      const error = new Error(message || "Failed to load Fellow action items.");
+      error.status = response.status || 400;
+      throw error;
+    }
+
+    if (!payload || typeof payload !== "object") {
+      throw new Error("Unexpected response from Fellow.");
+    }
+
+    const graphqlData = payload.data;
+
+    if (graphqlData && typeof graphqlData === "object") {
+      return graphqlData;
+    }
+
+    return payload;
+  }
+
+  if (lastAuthError) {
+    throw lastAuthError;
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  const authError = new Error("Failed to authenticate with Fellow using the provided token.");
+  authError.status = 401;
+  throw authError;
 }
 
 async function requestActionItems(url, authHeaderOptions) {
@@ -839,11 +996,16 @@ async function fetchAssignedActionItems(baseUrl, token, limit) {
   }
 
   if (notFoundError) {
-    const enhancedError = new Error(
-      "Fellow action items endpoint was not found. Please verify the configured FELLOW_API_BASE_URL matches the REST API host (for example, https://api.fellow.app)."
-    );
-    enhancedError.status = 404;
-    throw enhancedError;
+    try {
+      return await fetchAssignedActionItemsViaGraphql(baseUrl, authHeaderOptions, limit);
+    } catch (graphqlError) {
+      const enhancedError = new Error(
+        "Fellow action items endpoint was not found and the GraphQL fallback also failed. Please verify the configured FELLOW_API_BASE_URL matches the REST or GraphQL API host (for example, https://api.fellow.app)."
+      );
+      enhancedError.status = graphqlError.status || notFoundError.status || 404;
+      enhancedError.cause = graphqlError;
+      throw enhancedError;
+    }
   }
 
   if (lastRetryableError) {
