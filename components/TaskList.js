@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 const SOURCE_BADGE_CLASS = {
   GitHub: "github",
   "Google Tasks": "google",
-  Fellow: "fellow",
+  Trello: "trello",
 };
 
 function formatDueDate(value) {
@@ -78,11 +78,11 @@ export default function TaskList() {
 
             return Array.isArray(data) ? data : [];
           }),
-          fetch("/api/fellow", { signal }).then(async (response) => {
+          fetch("/api/trello", { signal }).then(async (response) => {
             const data = await response.json().catch(() => null);
 
             if (!response.ok) {
-              const error = new Error(data?.error || "Failed to load Fellow action items.");
+              const error = new Error(data?.error || "Failed to load Trello cards.");
               error.status = response.status;
               throw error;
             }
@@ -91,7 +91,7 @@ export default function TaskList() {
           }),
         ];
 
-        const [githubResult, googleResult, fellowResult] = await Promise.allSettled(requests);
+        const [githubResult, googleResult, trelloResult] = await Promise.allSettled(requests);
 
         if (signal?.aborted) {
           return;
@@ -119,12 +119,12 @@ export default function TaskList() {
           console.error("Failed to load Google Tasks:", googleResult.reason);
         }
 
-        if (fellowResult.status === "fulfilled") {
-          combinedTasks.push(...fellowResult.value);
+        if (trelloResult.status === "fulfilled") {
+          combinedTasks.push(...trelloResult.value);
         } else {
-          const isConfigError = fellowResult.reason?.status === 503;
-          errors.push(isConfigError ? "Fellow (integration not configured)" : "Fellow");
-          console.error("Failed to load Fellow action items:", fellowResult.reason);
+          const isConfigError = trelloResult.reason?.status === 503;
+          errors.push(isConfigError ? "Trello (integration not configured)" : "Trello");
+          console.error("Failed to load Trello cards:", trelloResult.reason);
         }
 
         setTasks(combinedTasks);
@@ -334,7 +334,7 @@ export default function TaskList() {
         </div>
         <p className="task-card__description">
           Review GitHub issues, keep your Google Tasks organized, and stay accountable for your
-          Fellow action items without leaving your cockpit.
+          Trello cards without leaving your cockpit.
         </p>
       </header>
 
@@ -373,9 +373,11 @@ export default function TaskList() {
                       ? task.repo
                       : task.source === "Google Tasks"
                       ? `Pipeline: ${task.pipelineName}`
+                      : task.source === "Trello" && task.pipelineName
+                      ? `List: ${task.pipelineName} · ${task.repo}`
                       : task.repo}
                   </p>
-                  {task.source === "Fellow" && (dueLabel || statusLabel) && (
+                  {task.source === "Trello" && (dueLabel || statusLabel) && (
                     <p className="task-item__meta-detail">
                       {dueLabel && <span>Due {dueLabel}</span>}
                       {dueLabel && statusLabel && <span aria-hidden="true"> · </span>}
