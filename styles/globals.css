@@ -262,9 +262,9 @@ main {
   color: var(--success-strong);
 }
 
-.task-item__badge--fellow {
-  background: rgba(236, 72, 153, 0.12);
-  color: #be185d;
+.task-item__badge--trello {
+  background: rgba(2, 106, 167, 0.12);
+  color: #026aa7;
 }
 
 .task-item__badge--default {
