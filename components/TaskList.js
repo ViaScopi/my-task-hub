@@ -46,6 +46,8 @@ export default function TaskList() {
   const [submitting, setSubmitting] = useState(false);
   const [completionError, setCompletionError] = useState("");
   const [pipelineStatus, setPipelineStatus] = useState({});
+  const [trelloCardStatus, setTrelloCardStatus] = useState({});
+  const [trelloComments, setTrelloComments] = useState({});
 
   const loadTasks = useCallback(
     async ({ silent = false, signal } = {}) => {
@@ -162,6 +164,28 @@ export default function TaskList() {
       controller.abort();
     };
   }, [loadTasks]);
+
+  useEffect(() => {
+    setTrelloCardStatus((prev) => {
+      const next = {};
+      tasks.forEach((task) => {
+        if (task.source === "Trello" && prev[task.id]) {
+          next[task.id] = prev[task.id];
+        }
+      });
+      return next;
+    });
+
+    setTrelloComments((prev) => {
+      const next = {};
+      tasks.forEach((task) => {
+        if (task.source === "Trello") {
+          next[task.id] = prev[task.id] ?? "";
+        }
+      });
+      return next;
+    });
+  }, [tasks]);
 
   const startCompletion = (task) => {
     if (!task || task.source !== "GitHub") {
@@ -299,6 +323,161 @@ export default function TaskList() {
     }
   };
 
+  const moveTrelloCard = async (task, targetListId) => {
+    if (!task || task.source !== "Trello") {
+      return;
+    }
+
+    if (!targetListId || targetListId === task.pipelineId) {
+      return;
+    }
+
+    const selectedList = task.pipelineOptions?.find((option) => option.id === targetListId);
+
+    setTrelloCardStatus((prev) => ({
+      ...prev,
+      [task.id]: {
+        ...(prev[task.id] || {}),
+        moveLoading: true,
+        moveError: "",
+        moveSuccess: "",
+      },
+    }));
+
+    try {
+      const response = await fetch("/api/trello", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "move",
+          cardId: task.trelloCardId,
+          targetListId,
+        }),
+      });
+
+      const responseData = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = responseData?.error || "Failed to move the Trello card.";
+        throw new Error(message);
+      }
+
+      setTasks((prevTasks) =>
+        prevTasks.map((item) => {
+          if (item.id !== task.id) {
+            return item;
+          }
+
+          return {
+            ...item,
+            pipelineId: targetListId,
+            pipelineName: selectedList?.name || item.pipelineName,
+            trelloListId: targetListId,
+          };
+        })
+      );
+
+      setTrelloCardStatus((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          moveLoading: false,
+          moveError: "",
+          moveSuccess: selectedList?.name
+            ? `Moved to ${selectedList.name}.`
+            : "Card moved successfully.",
+        },
+      }));
+    } catch (err) {
+      console.error("Failed to move Trello card:", err);
+      setTrelloCardStatus((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          moveLoading: false,
+          moveError: err.message || "Unable to move the Trello card.",
+          moveSuccess: "",
+        },
+      }));
+    }
+  };
+
+  const submitTrelloComment = async (task) => {
+    if (!task || task.source !== "Trello") {
+      return;
+    }
+
+    const draftComment = trelloComments[task.id] ?? "";
+    const trimmedComment = draftComment.trim();
+
+    if (!trimmedComment) {
+      setTrelloCardStatus((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          commentError: "Please add a comment before submitting.",
+          commentSuccess: "",
+        },
+      }));
+      return;
+    }
+
+    setTrelloCardStatus((prev) => ({
+      ...prev,
+      [task.id]: {
+        ...(prev[task.id] || {}),
+        commentLoading: true,
+        commentError: "",
+        commentSuccess: "",
+      },
+    }));
+
+    try {
+      const response = await fetch("/api/trello", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "comment",
+          cardId: task.trelloCardId,
+          comment: trimmedComment,
+        }),
+      });
+
+      const responseData = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = responseData?.error || "Failed to add the Trello comment.";
+        throw new Error(message);
+      }
+
+      setTrelloComments((prev) => ({
+        ...prev,
+        [task.id]: "",
+      }));
+
+      setTrelloCardStatus((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          commentLoading: false,
+          commentError: "",
+          commentSuccess: "Comment added successfully.",
+        },
+      }));
+    } catch (err) {
+      console.error("Failed to add Trello comment:", err);
+      setTrelloCardStatus((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          commentLoading: false,
+          commentError: err.message || "Unable to add the Trello comment.",
+          commentSuccess: "",
+        },
+      }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="task-card">
@@ -346,6 +525,8 @@ export default function TaskList() {
           const description = task.description?.trim();
           const badgeClass = SOURCE_BADGE_CLASS[task.source] || "default";
           const pipelineState = pipelineStatus[task.id] || {};
+          const trelloState = trelloCardStatus[task.id] || {};
+          const trelloComment = trelloComments[task.id] ?? "";
           const dueLabel = formatDueDate(task.dueDate || task.due);
           const statusLabel = formatStatus(task.status);
 
@@ -416,6 +597,27 @@ export default function TaskList() {
                 </div>
               )}
 
+              {task.source === "Trello" && task.pipelineOptions?.length > 0 && (
+                <div className="task-item__pipeline">
+                  <label htmlFor={`trello-pipeline-${task.id}`}>List</label>
+                  <select
+                    id={`trello-pipeline-${task.id}`}
+                    className="task-item__pipeline-select"
+                    value={task.pipelineId}
+                    onChange={(event) => moveTrelloCard(task, event.target.value)}
+                    disabled={Boolean(trelloState.moveLoading)}
+                  >
+                    {task.pipelineOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                  {trelloState.moveError && <p className="task-item__error">{trelloState.moveError}</p>}
+                  {trelloState.moveSuccess && <p className="task-item__success">{trelloState.moveSuccess}</p>}
+                </div>
+              )}
+
               {description ? (
                 <p className="task-item__description">{description}</p>
               ) : (
@@ -455,6 +657,49 @@ export default function TaskList() {
                       disabled={submitting}
                     >
                       Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {task.source === "Trello" && (
+                <div className="task-item__completion">
+                  <label htmlFor={`trello-comment-${task.id}`}>Add a comment to this card</label>
+                  <textarea
+                    id={`trello-comment-${task.id}`}
+                    className="task-item__note"
+                    rows={3}
+                    value={trelloComment}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setTrelloComments((prev) => ({
+                        ...prev,
+                        [task.id]: value,
+                      }));
+                      setTrelloCardStatus((prev) => ({
+                        ...prev,
+                        [task.id]: {
+                          ...(prev[task.id] || {}),
+                          commentError: "",
+                          commentSuccess: "",
+                        },
+                      }));
+                    }}
+                    placeholder="Share an update with your teammates…"
+                    disabled={Boolean(trelloState.commentLoading)}
+                  />
+                  {trelloState.commentError && <p className="task-item__error">{trelloState.commentError}</p>}
+                  {trelloState.commentSuccess && (
+                    <p className="task-item__success">{trelloState.commentSuccess}</p>
+                  )}
+                  <div className="task-item__actions">
+                    <button
+                      type="button"
+                      onClick={() => submitTrelloComment(task)}
+                      className="button button--primary"
+                      disabled={Boolean(trelloState.commentLoading)}
+                    >
+                      {trelloState.commentLoading ? "Posting..." : "Add comment"}
                     </button>
                   </div>
                 </div>
