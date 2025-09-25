@@ -125,7 +125,36 @@ function normalizeCardUrl(card) {
   return "";
 }
 
-function mapCardsToTasks(cards) {
+function mapListsToOptions(lists) {
+  if (!Array.isArray(lists)) {
+    return [];
+  }
+
+  const options = [];
+  const seen = new Set();
+
+  for (const list of lists) {
+    if (!list || typeof list !== "object") {
+      continue;
+    }
+
+    const id = typeof list.id === "string" ? list.id.trim() : "";
+
+    if (!id || seen.has(id)) {
+      continue;
+    }
+
+    seen.add(id);
+
+    const name = list.name?.trim() || "Untitled list";
+
+    options.push({ id, name });
+  }
+
+  return options;
+}
+
+function mapCardsToTasks(cards, boardLists = new Map()) {
   if (!Array.isArray(cards)) {
     return [];
   }
@@ -159,6 +188,11 @@ function mapCardsToTasks(cards) {
       status = "Closed";
     }
 
+    const boardId = typeof card.idBoard === "string" ? card.idBoard.trim() : "";
+    const pipelineOptions = boardId
+      ? mapListsToOptions(boardLists.get(boardId))
+      : [];
+
     tasks.push({
       id: `trello-${id}`,
       source: "Trello",
@@ -168,12 +202,12 @@ function mapCardsToTasks(cards) {
       repo: boardName ? `Board: ${boardName}` : "Trello",
       pipelineId: card.idList || "",
       pipelineName: listName || "",
-      pipelineOptions: [],
+      pipelineOptions,
       dueDate: due,
       due,
       status,
       trelloCardId: id,
-      trelloBoardId: card.idBoard || "",
+      trelloBoardId: boardId,
       trelloListId: card.idList || "",
     });
   }
@@ -240,47 +274,228 @@ async function fetchMemberCards(baseUrl, key, token, memberId, limit) {
   return data;
 }
 
-export async function handler(req, res) {
-  if (req.method !== "GET") {
-    res.setHeader("Allow", "GET");
-    return res.status(405).json({ error: "Method not allowed" });
+async function fetchBoardLists(baseUrl, key, token, boardId) {
+  if (!boardId) {
+    return [];
+  }
+
+  const url = new URL(buildUrl(baseUrl, `boards/${encodeURIComponent(boardId)}/lists`));
+  url.searchParams.set("key", key);
+  url.searchParams.set("token", token);
+  url.searchParams.set("filter", "open");
+  url.searchParams.set("fields", "name");
+
+  const response = await fetch(url.toString(), {
+    headers: { Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    let message = `Trello API responded with status ${response.status}.`;
+
+    try {
+      const data = await response.json();
+      message = data?.message || data?.error || message;
+    } catch (error) {
+      // Ignore JSON parse errors and fall back to the default message.
+    }
+
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  const data = await response.json();
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data;
+}
+
+async function moveCardToList(baseUrl, key, token, cardId, targetListId) {
+  const url = new URL(buildUrl(baseUrl, `cards/${encodeURIComponent(cardId)}/idList`));
+  url.searchParams.set("key", key);
+  url.searchParams.set("token", token);
+  url.searchParams.set("value", targetListId);
+
+  const response = await fetch(url.toString(), {
+    method: "PUT",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    let message = `Trello API responded with status ${response.status}.`;
+
+    try {
+      const data = await response.json();
+      message = data?.message || data?.error || message;
+    } catch (error) {
+      // Ignore JSON parse errors and fall back to the default message.
+    }
+
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   try {
-    const { key, token } = ensureConfiguredAuth();
-    const memberId = ensureConfiguredMemberId();
-    const baseUrl = getBaseUrl();
-    const limit = getCardLimit();
-    const boardIds = getConfiguredBoardIds();
-
-    const cards = await fetchMemberCards(baseUrl, key, token, memberId, limit);
-    const filteredCards = filterCardsByBoard(cards, boardIds);
-    const tasks = mapCardsToTasks(filteredCards);
-
-    return res.status(200).json(tasks);
+    return await response.json();
   } catch (error) {
-    if (error.code === MISSING_CREDENTIALS_ERROR) {
-      return res.status(503).json({ error: error.message });
-    }
-
-    const status = Number.isInteger(error.status) ? error.status : null;
-
-    if (status === 401 || status === 403) {
-      console.error("Trello API authentication error:", error);
-      return res.status(503).json({
-        error:
-          "Trello integration authentication failed. Please verify the configured TRELLO_API_KEY, TRELLO_TOKEN, and TRELLO_MEMBER_ID.",
-      });
-    }
-
-    if (status && status >= 400 && status < 600) {
-      console.error("Trello API error:", error);
-      return res.status(status).json({ error: error.message || "Failed to load Trello cards." });
-    }
-
-    console.error("Trello API error:", error);
-    return res.status(500).json({ error: error.message || "Failed to load Trello cards." });
+    return null;
   }
+}
+
+async function addCommentToCard(baseUrl, key, token, cardId, comment) {
+  const url = new URL(buildUrl(baseUrl, `cards/${encodeURIComponent(cardId)}/actions/comments`));
+  url.searchParams.set("key", key);
+  url.searchParams.set("token", token);
+
+  const body = new URLSearchParams();
+  body.set("text", comment);
+
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+
+  if (!response.ok) {
+    let message = `Trello API responded with status ${response.status}.`;
+
+    try {
+      const data = await response.json();
+      message = data?.message || data?.error || message;
+    } catch (error) {
+      // Ignore JSON parse errors and fall back to the default message.
+    }
+
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  try {
+    return await response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function handler(req, res) {
+  if (req.method === "GET") {
+    try {
+      const { key, token } = ensureConfiguredAuth();
+      const memberId = ensureConfiguredMemberId();
+      const baseUrl = getBaseUrl();
+      const limit = getCardLimit();
+      const boardIds = getConfiguredBoardIds();
+
+      const cards = await fetchMemberCards(baseUrl, key, token, memberId, limit);
+      const filteredCards = filterCardsByBoard(cards, boardIds);
+
+      const boardIdSet = new Set();
+      for (const card of filteredCards) {
+        const boardId = typeof card?.idBoard === "string" ? card.idBoard.trim() : "";
+        if (boardId) {
+          boardIdSet.add(boardId);
+        }
+      }
+
+      const boardListEntries = await Promise.all(
+        Array.from(boardIdSet).map(async (boardId) => {
+          try {
+            const lists = await fetchBoardLists(baseUrl, key, token, boardId);
+            return [boardId, lists];
+          } catch (error) {
+            console.error(`Failed to load Trello lists for board ${boardId}:`, error);
+            return [boardId, []];
+          }
+        })
+      );
+
+      const boardLists = new Map(boardListEntries);
+      const tasks = mapCardsToTasks(filteredCards, boardLists);
+
+      return res.status(200).json(tasks);
+    } catch (error) {
+      if (error.code === MISSING_CREDENTIALS_ERROR) {
+        return res.status(503).json({ error: error.message });
+      }
+
+      const status = Number.isInteger(error.status) ? error.status : null;
+
+      if (status === 401 || status === 403) {
+        console.error("Trello API authentication error:", error);
+        return res.status(503).json({
+          error:
+            "Trello integration authentication failed. Please verify the configured TRELLO_API_KEY, TRELLO_TOKEN, and TRELLO_MEMBER_ID.",
+        });
+      }
+
+      if (status && status >= 400 && status < 600) {
+        console.error("Trello API error:", error);
+        return res.status(status).json({ error: error.message || "Failed to load Trello cards." });
+      }
+
+      console.error("Trello API error:", error);
+      return res.status(500).json({ error: error.message || "Failed to load Trello cards." });
+    }
+  }
+
+  if (req.method === "POST") {
+    try {
+      const { key, token } = ensureConfiguredAuth();
+      const baseUrl = getBaseUrl();
+
+      const action = req.body?.action;
+
+      if (action === "move") {
+        const cardId = req.body?.cardId?.trim();
+        const targetListId = req.body?.targetListId?.trim();
+
+        if (!cardId || !targetListId) {
+          return res.status(400).json({ error: "cardId and targetListId are required to move a Trello card." });
+        }
+
+        await moveCardToList(baseUrl, key, token, cardId, targetListId);
+        return res.status(200).json({ success: true, cardId, targetListId });
+      }
+
+      if (action === "comment") {
+        const cardId = req.body?.cardId?.trim();
+        const comment = req.body?.comment?.trim();
+
+        if (!cardId || !comment) {
+          return res
+            .status(400)
+            .json({ error: "cardId and a non-empty comment are required to add a Trello comment." });
+        }
+
+        await addCommentToCard(baseUrl, key, token, cardId, comment);
+        return res.status(200).json({ success: true, cardId });
+      }
+
+      return res.status(400).json({ error: "Unsupported Trello action." });
+    } catch (error) {
+      if (error.code === MISSING_CREDENTIALS_ERROR) {
+        return res.status(503).json({ error: error.message });
+      }
+
+      const status = Number.isInteger(error.status) ? error.status : null;
+
+      if (status && status >= 400 && status < 600) {
+        console.error("Trello API error:", error);
+        return res.status(status).json({ error: error.message || "Failed to update Trello card." });
+      }
+
+      console.error("Trello API error:", error);
+      return res.status(500).json({ error: error.message || "Failed to update Trello card." });
+    }
+  }
+
+  res.setHeader("Allow", "GET, POST");
+  return res.status(405).json({ error: "Method not allowed" });
 }
 
 export default handler;
@@ -291,4 +506,8 @@ export {
   fetchMemberCards,
   ensureBaseUrl,
   buildUrl,
+  fetchBoardLists,
+  moveCardToList,
+  addCommentToCard,
+  mapListsToOptions,
 };

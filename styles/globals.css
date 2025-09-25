@@ -364,6 +364,13 @@ main {
   font-weight: 500;
 }
 
+.task-item__success {
+  margin: 0.5rem 0 0 0;
+  color: var(--success-strong);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
 .task-item__actions {
   display: flex;
   flex-wrap: wrap;
