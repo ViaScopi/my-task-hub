@@ -38,14 +38,14 @@ function buildUrl(baseUrl, path) {
     return normalizedBase;
   }
 
-  try {
-    const baseForUrl = normalizedBase.endsWith("/") ? normalizedBase : `${normalizedBase}/`;
-    return new URL(path, baseForUrl).toString();
-  } catch (error) {
-    const trimmedBase = normalizedBase.replace(/\/+$/, "");
-    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-    return `${trimmedBase}${normalizedPath}`;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(path)) {
+    return path;
   }
+
+  const trimmedBase = normalizedBase.replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  return `${trimmedBase}${normalizedPath}`;
 }
 
 function getBaseUrl() {
@@ -195,7 +195,7 @@ function filterCardsByBoard(cards, boardIds) {
 }
 
 async function fetchMemberCards(baseUrl, key, token, memberId, limit) {
-  const url = new URL(buildUrl(baseUrl, `/members/${encodeURIComponent(memberId)}/cards`));
+  const url = new URL(buildUrl(baseUrl, `members/${encodeURIComponent(memberId)}/cards`));
   url.searchParams.set("key", key);
   url.searchParams.set("token", token);
   url.searchParams.set("filter", "open");
@@ -290,4 +290,5 @@ export {
   filterCardsByBoard,
   fetchMemberCards,
   ensureBaseUrl,
+  buildUrl,
 };

@@ -54,10 +54,19 @@ test("filters cards by configured board IDs", async () => {
 });
 
 test("ensureBaseUrl normalizes Trello endpoints", async () => {
-  const { ensureBaseUrl } = await import("../trello.js");
+  const { ensureBaseUrl, buildUrl } = await import("../trello.js");
 
   assert.equal(ensureBaseUrl("api.trello.com/1"), "https://api.trello.com/1");
   assert.equal(ensureBaseUrl("https://api.trello.com/1/"), "https://api.trello.com/1");
+
+  assert.equal(
+    buildUrl("https://api.trello.com/1", "/members/test/cards"),
+    "https://api.trello.com/1/members/test/cards"
+  );
+  assert.equal(
+    buildUrl("https://api.trello.com/1/", "members/test/cards"),
+    "https://api.trello.com/1/members/test/cards"
+  );
 });
 
 test("fetchMemberCards requests open cards with board and list context", async () => {
@@ -90,7 +99,7 @@ test("fetchMemberCards requests open cards with board and list context", async (
   const request = requests[0];
   const params = request.url.searchParams;
 
-  assert.equal(request.url.pathname, "/members/member/cards");
+  assert.equal(request.url.pathname, "/1/members/member/cards");
   assert.equal(params.get("key"), "key");
   assert.equal(params.get("token"), "token");
   assert.equal(params.get("filter"), "open");
