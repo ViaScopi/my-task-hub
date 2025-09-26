@@ -81,10 +81,8 @@ function ensureConfiguredMemberId() {
   return memberId;
 }
 
-function getConfiguredBoardIds() {
-  const raw = process.env.TRELLO_BOARD_IDS;
-
-  if (!raw) {
+function parseBoardIds(raw) {
+  if (!raw || typeof raw !== "string") {
     return [];
   }
 
@@ -92,6 +90,18 @@ function getConfiguredBoardIds() {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function getConfiguredBoardIds() {
+  return parseBoardIds(process.env.TRELLO_BOARD_IDS);
+}
+
+function getExcludedBoardIds() {
+  return parseBoardIds(process.env.TRELLO_EXCLUDED_BOARD_IDS);
+}
+
+function getConfiguredFellowBoardIds() {
+  return parseBoardIds(process.env.TRELLO_FELLOW_BOARD_IDS);
 }
 
 function getCardLimit() {
@@ -215,16 +225,42 @@ function mapCardsToTasks(cards, boardLists = new Map()) {
   return tasks;
 }
 
-function filterCardsByBoard(cards, boardIds) {
-  if (!Array.isArray(cards) || !Array.isArray(boardIds) || boardIds.length === 0) {
-    return Array.isArray(cards) ? cards : [];
+function filterCardsByBoard(cards, boardIds, excludedBoardIds = []) {
+  if (!Array.isArray(cards)) {
+    return [];
   }
 
-  const normalizedIds = new Set(boardIds.map((id) => id.trim()).filter(Boolean));
+  const excludedIds = new Set(
+    Array.isArray(excludedBoardIds)
+      ? excludedBoardIds.map((id) => id.trim()).filter(Boolean)
+      : []
+  );
+  const normalizedBoardIds = Array.isArray(boardIds)
+    ? boardIds.map((id) => id.trim()).filter(Boolean)
+    : [];
+  const hasAllowList = normalizedBoardIds.length > 0;
+  const allowedIds = new Set(normalizedBoardIds);
+
+  if (!hasAllowList && excludedIds.size === 0) {
+    return cards;
+  }
 
   return cards.filter((card) => {
-    const boardId = typeof card?.idBoard === "string" ? card.idBoard.trim() : "";
-    return boardId && normalizedIds.has(boardId);
+    if (!card || typeof card !== "object") {
+      return false;
+    }
+
+    const boardId = typeof card.idBoard === "string" ? card.idBoard.trim() : "";
+
+    if (boardId && excludedIds.has(boardId)) {
+      return false;
+    }
+
+    if (!hasAllowList) {
+      return true;
+    }
+
+    return boardId && allowedIds.has(boardId);
   });
 }
 
@@ -390,9 +426,10 @@ export async function handler(req, res) {
       const baseUrl = getBaseUrl();
       const limit = getCardLimit();
       const boardIds = getConfiguredBoardIds();
+      const excludedBoardIds = getExcludedBoardIds();
 
       const cards = await fetchMemberCards(baseUrl, key, token, memberId, limit);
-      const filteredCards = filterCardsByBoard(cards, boardIds);
+      const filteredCards = filterCardsByBoard(cards, boardIds, excludedBoardIds);
 
       const boardIdSet = new Set();
       for (const card of filteredCards) {
@@ -504,6 +541,13 @@ export {
   mapCardsToTasks,
   filterCardsByBoard,
   fetchMemberCards,
+  getConfiguredBoardIds,
+  getExcludedBoardIds,
+  getConfiguredFellowBoardIds,
+  getCardLimit,
+  getBaseUrl,
+  ensureConfiguredAuth,
+  ensureConfiguredMemberId,
   ensureBaseUrl,
   buildUrl,
   fetchBoardLists,

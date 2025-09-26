@@ -4,6 +4,7 @@ const SOURCE_BADGE_CLASS = {
   GitHub: "github",
   "Google Tasks": "google",
   Trello: "trello",
+  Fellow: "trello",
 };
 
 function formatDueDate(value) {
@@ -91,9 +92,22 @@ export default function TaskList() {
 
             return Array.isArray(data) ? data : [];
           }),
+          fetch("/api/trello-fellow", { signal }).then(async (response) => {
+            const data = await response.json().catch(() => null);
+
+            if (!response.ok) {
+              const error = new Error(data?.error || "Failed to load Fellow cards.");
+              error.status = response.status;
+              throw error;
+            }
+
+            return Array.isArray(data) ? data : [];
+          }),
         ];
 
-        const [githubResult, googleResult, trelloResult] = await Promise.allSettled(requests);
+        const [githubResult, googleResult, trelloResult, fellowResult] = await Promise.allSettled(
+          requests
+        );
 
         if (signal?.aborted) {
           return;
@@ -127,6 +141,14 @@ export default function TaskList() {
           const isConfigError = trelloResult.reason?.status === 503;
           errors.push(isConfigError ? "Trello (integration not configured)" : "Trello");
           console.error("Failed to load Trello cards:", trelloResult.reason);
+        }
+
+        if (fellowResult.status === "fulfilled") {
+          combinedTasks.push(...fellowResult.value);
+        } else {
+          const isConfigError = fellowResult.reason?.status === 503;
+          errors.push(isConfigError ? "Fellow (integration not configured)" : "Fellow");
+          console.error("Failed to load Fellow cards:", fellowResult.reason);
         }
 
         setTasks(combinedTasks);
@@ -169,7 +191,7 @@ export default function TaskList() {
     setTrelloCardStatus((prev) => {
       const next = {};
       tasks.forEach((task) => {
-        if (task.source === "Trello" && prev[task.id]) {
+        if (task.trelloCardId && prev[task.id]) {
           next[task.id] = prev[task.id];
         }
       });
@@ -179,7 +201,7 @@ export default function TaskList() {
     setTrelloComments((prev) => {
       const next = {};
       tasks.forEach((task) => {
-        if (task.source === "Trello") {
+        if (task.trelloCardId) {
           next[task.id] = prev[task.id] ?? "";
         }
       });
@@ -324,7 +346,7 @@ export default function TaskList() {
   };
 
   const moveTrelloCard = async (task, targetListId) => {
-    if (!task || task.source !== "Trello") {
+    if (!task?.trelloCardId) {
       return;
     }
 
@@ -403,7 +425,7 @@ export default function TaskList() {
   };
 
   const submitTrelloComment = async (task) => {
-    if (!task || task.source !== "Trello") {
+    if (!task?.trelloCardId) {
       return;
     }
 
@@ -554,11 +576,11 @@ export default function TaskList() {
                       ? task.repo
                       : task.source === "Google Tasks"
                       ? `Pipeline: ${task.pipelineName}`
-                      : task.source === "Trello" && task.pipelineName
+                      : task.trelloCardId && task.pipelineName
                       ? `List: ${task.pipelineName} · ${task.repo}`
                       : task.repo}
                   </p>
-                  {task.source === "Trello" && (dueLabel || statusLabel) && (
+                  {task.trelloCardId && (dueLabel || statusLabel) && (
                     <p className="task-item__meta-detail">
                       {dueLabel && <span>Due {dueLabel}</span>}
                       {dueLabel && statusLabel && <span aria-hidden="true"> · </span>}
@@ -597,7 +619,7 @@ export default function TaskList() {
                 </div>
               )}
 
-              {task.source === "Trello" && task.pipelineOptions?.length > 0 && (
+              {task.trelloCardId && task.pipelineOptions?.length > 0 && (
                 <div className="task-item__pipeline">
                   <label htmlFor={`trello-pipeline-${task.id}`}>List</label>
                   <select
@@ -662,7 +684,7 @@ export default function TaskList() {
                 </div>
               )}
 
-              {task.source === "Trello" && (
+              {task.trelloCardId && (
                 <div className="task-item__completion">
                   <label htmlFor={`trello-comment-${task.id}`}>Add a comment to this card</label>
                   <textarea
