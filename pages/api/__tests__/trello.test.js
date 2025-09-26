@@ -37,6 +37,7 @@ test("maps Trello cards into task objects", async () => {
   const [task] = tasks;
 
   assert.equal(task.id, "trello-abc123");
+  assert.equal(task.source, "Trello");
   assert.equal(task.title, "Update onboarding docs");
   assert.equal(task.description, "Ensure the getting started guide references the latest tooling.");
   assert.equal(task.repo, "Board: Product Ops");
@@ -50,6 +51,35 @@ test("maps Trello cards into task objects", async () => {
     { id: "list-2", name: "In Progress" },
     { id: "list-3", name: "Review" },
   ]);
+});
+
+test("maps cards from the fellow board with a Fellow source label", async () => {
+  const originalValue = process.env.TRELLO_FELLOW_BOARD_ID;
+  process.env.TRELLO_FELLOW_BOARD_ID = "fellow-board";
+
+  try {
+    const { mapCardsToTasks } = await import("../trello.js?fellow");
+
+    const cards = [
+      {
+        id: "fellow-1",
+        name: "Prep mentorship notes",
+        idBoard: "fellow-board",
+        idList: "list-1",
+      },
+    ];
+
+    const tasks = mapCardsToTasks(cards, new Map());
+
+    assert.equal(tasks.length, 1);
+    assert.equal(tasks[0].source, "Fellow");
+  } finally {
+    if (originalValue === undefined) {
+      delete process.env.TRELLO_FELLOW_BOARD_ID;
+    } else {
+      process.env.TRELLO_FELLOW_BOARD_ID = originalValue;
+    }
+  }
 });
 
 test("filters cards by configured board IDs", async () => {

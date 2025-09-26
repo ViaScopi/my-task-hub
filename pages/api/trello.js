@@ -154,6 +154,16 @@ function mapListsToOptions(lists) {
   return options;
 }
 
+function getBoardSource(boardId) {
+  const fellowBoardId = process.env.TRELLO_FELLOW_BOARD_ID?.trim();
+
+  if (fellowBoardId && boardId === fellowBoardId) {
+    return "Fellow";
+  }
+
+  return "Trello";
+}
+
 function mapCardsToTasks(cards, boardLists = new Map()) {
   if (!Array.isArray(cards)) {
     return [];
@@ -192,10 +202,11 @@ function mapCardsToTasks(cards, boardLists = new Map()) {
     const pipelineOptions = boardId
       ? mapListsToOptions(boardLists.get(boardId))
       : [];
+    const source = getBoardSource(boardId);
 
     tasks.push({
       id: `trello-${id}`,
-      source: "Trello",
+      source,
       title,
       description,
       url: normalizeCardUrl(card),

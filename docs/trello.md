@@ -8,6 +8,8 @@ The Trello sync relies on the following environment variables:
   assigned cards will be fetched.
 - `TRELLO_BOARD_IDS` – optional comma-separated list of Trello board IDs to include. When unset all
   open cards assigned to the configured member are returned.
+- `TRELLO_FELLOW_BOARD_ID` – optional Trello board ID whose cards should be labeled "Fellow" in the
+  UI instead of "Trello".
 - `TRELLO_API_BASE_URL` – optional base URL for the Trello API. Defaults to
   `https://api.trello.com/1` when unset.
 - `TRELLO_CARD_LIMIT` – optional cap for the number of cards fetched per request (defaults to `200`).
