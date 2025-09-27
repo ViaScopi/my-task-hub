@@ -4,7 +4,10 @@ const SOURCE_BADGE_CLASS = {
   GitHub: "github",
   "Google Tasks": "google",
   Trello: "trello",
+  Fellow: "trello",
 };
+
+const isTrelloTask = (task) => task?.source === "Trello" || task?.source === "Fellow";
 
 function formatDueDate(value) {
   if (!value) {
@@ -169,7 +172,7 @@ export default function TaskList() {
     setTrelloCardStatus((prev) => {
       const next = {};
       tasks.forEach((task) => {
-        if (task.source === "Trello" && prev[task.id]) {
+        if (isTrelloTask(task) && prev[task.id]) {
           next[task.id] = prev[task.id];
         }
       });
@@ -179,7 +182,7 @@ export default function TaskList() {
     setTrelloComments((prev) => {
       const next = {};
       tasks.forEach((task) => {
-        if (task.source === "Trello") {
+        if (isTrelloTask(task)) {
           next[task.id] = prev[task.id] ?? "";
         }
       });
@@ -324,7 +327,7 @@ export default function TaskList() {
   };
 
   const moveTrelloCard = async (task, targetListId) => {
-    if (!task || task.source !== "Trello") {
+    if (!task || !isTrelloTask(task)) {
       return;
     }
 
@@ -554,11 +557,11 @@ export default function TaskList() {
                       ? task.repo
                       : task.source === "Google Tasks"
                       ? `Pipeline: ${task.pipelineName}`
-                      : task.source === "Trello" && task.pipelineName
+                      : isTrelloTask(task) && task.pipelineName
                       ? `List: ${task.pipelineName} · ${task.repo}`
                       : task.repo}
                   </p>
-                  {task.source === "Trello" && (dueLabel || statusLabel) && (
+                  {isTrelloTask(task) && (dueLabel || statusLabel) && (
                     <p className="task-item__meta-detail">
                       {dueLabel && <span>Due {dueLabel}</span>}
                       {dueLabel && statusLabel && <span aria-hidden="true"> · </span>}
@@ -597,7 +600,7 @@ export default function TaskList() {
                 </div>
               )}
 
-              {task.source === "Trello" && task.pipelineOptions?.length > 0 && (
+              {isTrelloTask(task) && task.pipelineOptions?.length > 0 && (
                 <div className="task-item__pipeline">
                   <label htmlFor={`trello-pipeline-${task.id}`}>List</label>
                   <select
@@ -662,7 +665,7 @@ export default function TaskList() {
                 </div>
               )}
 
-              {task.source === "Trello" && (
+              {isTrelloTask(task) && (
                 <div className="task-item__completion">
                   <label htmlFor={`trello-comment-${task.id}`}>Add a comment to this card</label>
                   <textarea
