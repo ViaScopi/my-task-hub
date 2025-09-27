@@ -14,8 +14,8 @@
   --border-strong: rgba(99, 102, 241, 0.35);
   --card-bg: rgba(255, 255, 255, 0.92);
   --shadow: 0 30px 60px -30px rgba(79, 70, 229, 0.45);
-  --kanban-cursor-idle: url("/public/cursors/kanban-hover.svg") 16 12, grab;
-  --kanban-cursor-active: url("/public/cursors/kanban-drag.svg") 16 12, grabbing;
+  --kanban-cursor-idle: url("/cursors/kanban-hover.svg") 16 12, grab;
+  --kanban-cursor-active: url("/cursors/kanban-drag.svg") 16 12, grabbing;
 }
 
 * {
