@@ -14,7 +14,7 @@
   --border-strong: rgba(99, 102, 241, 0.35);
   --card-bg: rgba(255, 255, 255, 0.92);
   --shadow: 0 30px 60px -30px rgba(79, 70, 229, 0.45);
-  --kanban-cursor-idle: url("data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20width='48'%20height='48'%20viewBox='0%200%2048%2048'><rect%20x='10'%20y='3.5'%20width='6.2'%20height='20'%20rx='3.1'%20fill='%23fde68a'%20stroke='%2392400e'%20stroke-width='1.8'/><rect%20x='18'%20y='5.5'%20width='6.2'%20height='18'%20rx='3.1'%20fill='%23fde68a'%20stroke='%2392400e'%20stroke-width='1.8'/><rect%20x='26'%20y='7.5'%20width='6.2'%20height='16'%20rx='3.1'%20fill='%23fde68a'%20stroke='%2392400e'%20stroke-width='1.8'/><rect%20x='2'%20y='7'%20width='6.2'%20height='18'%20rx='3.1'%20fill='%23fde68a'%20stroke='%2392400e'%20stroke-width='1.8'/><path%20d='M9%2022h18c5%200%209%204%209%209v5c0%206.63-5.37%2012-12%2012h-5C11.37%2048%206%2042.63%206%2036v-5c0-5%204-9%209-9Z'%20fill='%23fcd34d'%20stroke='%2392400e'%20stroke-width='1.8'/><path%20d='M9.5%2030.5c1.4%203.6%203.9%206.4%207.3%208.3%202.7%201.5%206%202.2%209.8%202.2%204.2%200%207.9-1%2011-3.1'%20fill='none'%20stroke='%23f59e0b'%20stroke-width='1.6'%20stroke-linecap='round'/></svg>") 16 8, grab;
+  --kanban-cursor-idle: url("/cursors/kanban-hover.svg") 16 12, grab;
   --kanban-cursor-active: url("/cursors/kanban-drag.svg") 16 12, grabbing;
 }
 
