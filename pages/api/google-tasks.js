@@ -197,6 +197,12 @@ export default async function handler(req, res) {
 
       const tasksByList = await Promise.all(
         lists.map(async (list) => {
+          const listTitle = typeof list?.title === "string" ? list.title.trim() : "";
+
+          if (listTitle.toLowerCase() === "completed tasks") {
+            return [];
+          }
+
           try {
             const tasks = await fetchTasksForList(accessToken, list.id);
             return tasks.map((task) => mapTaskToResponse(task, list, pipelineOptions));

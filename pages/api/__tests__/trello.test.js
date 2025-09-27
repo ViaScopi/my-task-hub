@@ -53,6 +53,43 @@ test("maps Trello cards into task objects", async () => {
   ]);
 });
 
+test("skips cards that already live in a Completed list", async () => {
+  const { mapCardsToTasks } = await import("../trello.js?skip-completed");
+
+  const cards = [
+    {
+      id: "keep-me",
+      name: "Ship the dashboard",
+      idBoard: "board-1",
+      idList: "list-in-progress",
+      list: { name: "In Progress" },
+    },
+    {
+      id: "skip-me",
+      name: "Already done",
+      idBoard: "board-1",
+      idList: "list-completed",
+      list: { name: "Completed" },
+    },
+  ];
+
+  const boardLists = new Map([
+    [
+      "board-1",
+      [
+        { id: "list-in-progress", name: "In Progress" },
+        { id: "list-completed", name: "Completed" },
+      ],
+    ],
+  ]);
+
+  const tasks = mapCardsToTasks(cards, boardLists);
+
+  assert.equal(tasks.length, 1);
+  assert.equal(tasks[0].trelloCardId, "keep-me");
+  assert.equal(tasks[0].pipelineName, "In Progress");
+});
+
 test("maps cards from the fellow board with a Fellow source label", async () => {
   const originalValue = process.env.TRELLO_FELLOW_BOARD_ID;
   process.env.TRELLO_FELLOW_BOARD_ID = "fellow-board";
