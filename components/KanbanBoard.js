@@ -37,6 +37,8 @@ export default function KanbanBoard() {
   const { tasks, loading, fetchError } = useTasks();
   const [taskStages, setTaskStages] = useState({});
   const [visibleSources, setVisibleSources] = useState({});
+  const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const [dragOverStage, setDragOverStage] = useState(null);
 
   useEffect(() => {
     setTaskStages((prev) => {
@@ -90,11 +92,63 @@ export default function KanbanBoard() {
     }));
   };
 
-  const handleStageChange = (taskId, stage) => {
+  const handleDrop = (stage) => (event) => {
+    event.preventDefault();
+    if (!draggedTaskId) {
+      return;
+    }
+
     setTaskStages((prev) => ({
       ...prev,
-      [taskId]: stage,
+      [draggedTaskId]: stage,
     }));
+    setDraggedTaskId(null);
+    setDragOverStage(null);
+  };
+
+  const handleDragOver = (stage) => (event) => {
+    if (!draggedTaskId) {
+      return;
+    }
+
+    event.preventDefault();
+    if (dragOverStage !== stage) {
+      setDragOverStage(stage);
+    }
+  };
+
+  const handleDragLeave = (stage) => (event) => {
+    if (!draggedTaskId) {
+      return;
+    }
+
+    const nextTarget = event?.relatedTarget;
+    const currentTarget = event?.currentTarget;
+    const canCheckContainment = typeof Node !== "undefined" && nextTarget instanceof Node;
+
+    if (currentTarget && canCheckContainment) {
+      if (currentTarget.contains(nextTarget)) {
+        return;
+      }
+    }
+
+    if (dragOverStage === stage) {
+      setDragOverStage(null);
+    }
+  };
+
+  const handleDragStart = (taskId) => (event) => {
+    setDraggedTaskId(taskId);
+    setDragOverStage(taskStages[taskId] || "Backlog");
+    if (event?.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", String(taskId));
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTaskId(null);
+    setDragOverStage(null);
   };
 
   if (loading) {
@@ -139,9 +193,20 @@ export default function KanbanBoard() {
       <div className="kanban-board__columns">
         {STAGES.map((stage) => {
           const stageTasks = columns[stage] || [];
+          const columnClassName = `kanban-board__column${
+            dragOverStage === stage ? " kanban-board__column--active" : ""
+          }`;
 
           return (
-            <section key={stage} className="kanban-board__column" aria-label={`${stage} column`}>
+            <section
+              key={stage}
+              className={columnClassName}
+              aria-label={`${stage} column`}
+              onDragOver={handleDragOver(stage)}
+              onDragEnter={handleDragOver(stage)}
+              onDragLeave={handleDragLeave(stage)}
+              onDrop={handleDrop(stage)}
+            >
               <header className="kanban-board__column-header">
                 <h2>{stage}</h2>
                 <span className="kanban-board__count">{stageTasks.length}</span>
@@ -157,9 +222,19 @@ export default function KanbanBoard() {
                       : source.toLowerCase().includes("trello")
                         ? "task-item__badge--trello"
                         : "task-item__badge--default";
+                  const isDragging = draggedTaskId === task.id;
 
                   return (
-                    <li key={task.id} className="kanban-board__card">
+                    <li
+                      key={task.id}
+                      className={`kanban-board__card${
+                        isDragging ? " kanban-board__card--dragging" : ""
+                      }`}
+                      draggable
+                      onDragStart={handleDragStart(task.id)}
+                      onDragEnd={handleDragEnd}
+                      aria-grabbed={isDragging}
+                    >
                       <div className="kanban-board__card-meta">
                         <span className={`task-item__badge ${badgeClass}`}>{source}</span>
                         {(task.repo || task.pipelineName) && (
@@ -170,21 +245,9 @@ export default function KanbanBoard() {
                       {task.description && (
                         <p className="kanban-board__card-description">{task.description}</p>
                       )}
-                      <label className="kanban-board__stage-label" htmlFor={`stage-${task.id}`}>
-                        Stage
-                      </label>
-                      <select
-                        id={`stage-${task.id}`}
-                        className="kanban-board__stage-select"
-                        value={taskStages[task.id] || "Backlog"}
-                        onChange={(event) => handleStageChange(task.id, event.target.value)}
-                      >
-                        {STAGES.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
+                      <p className="kanban-board__stage-hint" role="note">
+                        Drag to move this task to a different stage.
+                      </p>
                     </li>
                   );
                 })}

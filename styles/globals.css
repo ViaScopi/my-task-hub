@@ -906,6 +906,13 @@ main {
   backdrop-filter: blur(10px);
   min-height: 0;
   overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.kanban-board__column--active {
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15), var(--shadow);
+  transform: translateY(-2px);
 }
 
 .kanban-board__column-header {
@@ -941,6 +948,7 @@ main {
   min-height: 0;
   overflow-y: auto;
   padding-right: 0.25rem;
+  min-height: 6rem;
 }
 
 @media (max-width: 959px) {
@@ -957,6 +965,19 @@ main {
   padding: 1rem;
   display: grid;
   gap: 0.6rem;
+  cursor: grab;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+.kanban-board__card:active {
+  cursor: grabbing;
+}
+
+.kanban-board__card--dragging {
+  opacity: 0.65;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.25);
+  transform: rotate(-1deg) scale(1.01);
+  cursor: grabbing;
 }
 
 .kanban-board__card-meta {
@@ -987,24 +1008,10 @@ main {
   word-break: break-word;
 }
 
-.kanban-board__stage-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--slate-600);
-}
-
-.kanban-board__stage-select {
-  border-radius: 12px;
-  border: 1px solid rgba(99, 102, 241, 0.25);
-  padding: 0.55rem 0.75rem;
-  font-size: 0.9rem;
-  background: rgba(255, 255, 255, 0.95);
-}
-
-.kanban-board__stage-select:focus {
-  outline: none;
-  border-color: var(--accent-strong);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+.kanban-board__stage-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--slate-500);
 }
 
 @media (max-width: 720px) {
