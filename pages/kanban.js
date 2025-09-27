@@ -24,8 +24,8 @@ export default function KanbanPage() {
       <header className="kanban-page__intro">
         <h1>Kanban board</h1>
         <p>
-          Drag and drop isn&apos;t required—use the stage selector on each task to move it between
-          columns, and filter by task source to focus on the right work.
+          Drag and drop cards between stages to keep work moving, and filter by task source to
+          focus on the right work.
         </p>
       </header>
       <KanbanBoard />
