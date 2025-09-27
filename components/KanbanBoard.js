@@ -3,6 +3,32 @@ import { useTasks } from "../hooks/useTasks";
 
 const STAGES = ["Backlog", "In Progress", "Review", "Done"];
 
+const MANAGED_COMPLETION_SOURCES = new Set(["GitHub", "Google Tasks", "Trello", "Fellow"]);
+
+function isManagedCompletionTask(task) {
+  if (!task) {
+    return false;
+  }
+
+  return MANAGED_COMPLETION_SOURCES.has(task.source);
+}
+
+function normalizeText(value) {
+  return value?.toString().trim().toLowerCase() || "";
+}
+
+function findPipelineOption(task, targetName) {
+  if (!task || !Array.isArray(task.pipelineOptions)) {
+    return null;
+  }
+
+  const normalizedTarget = normalizeText(targetName);
+
+  return (
+    task.pipelineOptions.find((option) => normalizeText(option?.name) === normalizedTarget) || null
+  );
+}
+
 function deriveInitialStage(task) {
   const statusText = [task?.status, task?.pipelineName, task?.state]
     .filter(Boolean)
@@ -34,11 +60,18 @@ function getSourceKey(task) {
 }
 
 export default function KanbanBoard() {
-  const { tasks, loading, fetchError } = useTasks();
+  const { tasks, setTasks, loading, fetchError } = useTasks();
   const [taskStages, setTaskStages] = useState({});
   const [visibleSources, setVisibleSources] = useState({});
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dragOverStage, setDragOverStage] = useState(null);
+  const [completionModal, setCompletionModal] = useState({
+    taskId: null,
+    note: "",
+    error: "",
+    submitting: false,
+    previousStage: null,
+  });
 
   useEffect(() => {
     setTaskStages((prev) => {
@@ -92,9 +125,305 @@ export default function KanbanBoard() {
     }));
   };
 
+  const handleModalNoteChange = (event) => {
+    const nextValue = event?.target?.value ?? "";
+    setCompletionModal((prev) => ({
+      ...prev,
+      note: nextValue,
+    }));
+  };
+
+  const confirmCompletion = async () => {
+    if (!completionTask) {
+      closeCompletionModal();
+      return;
+    }
+
+    const trimmedNote = completionModal.note.trim();
+
+    setCompletionModal((prev) => ({
+      ...prev,
+      submitting: true,
+      error: "",
+    }));
+
+    try {
+      if (completionTask.source === "GitHub") {
+        const repoSlug = completionTask.repo || "";
+        const [owner, repo] = repoSlug.split("/");
+
+        if (!owner || !repo || !completionTask.issue_number) {
+          throw new Error("Unable to determine the GitHub issue to close.");
+        }
+
+        const response = await fetch("/api/github", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            owner,
+            repo,
+            issue_number: completionTask.issue_number,
+            comment: trimmedNote,
+          }),
+        });
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          const message = data?.error || "Failed to mark the GitHub issue as done.";
+          throw new Error(message);
+        }
+
+        setTasks((prev) => prev.filter((item) => item.id !== completionTask.id));
+        setTaskStages((prev) => {
+          const next = { ...prev };
+          delete next[completionTask.id];
+          return next;
+        });
+      } else if (completionTask.source === "Google Tasks") {
+        const completedOption = findPipelineOption(completionTask, "Completed tasks");
+
+        if (!completedOption) {
+          throw new Error("Couldn't find a \"Completed tasks\" list for this Google Task.");
+        }
+
+        const currentListId = completionTask.googleTaskListId || completionTask.pipelineId;
+
+        if (!completionTask.googleTaskId || !currentListId) {
+          throw new Error("Unable to determine the Google Task identifiers to update.");
+        }
+
+        if (completedOption.id === currentListId) {
+          setTasks((prev) =>
+            prev.map((item) => {
+              if (item.id !== completionTask.id) {
+                return item;
+              }
+
+              return {
+                ...item,
+                pipelineName: completedOption.name,
+                repo: completedOption.name,
+              };
+            })
+          );
+
+          setTaskStages((prev) => ({
+            ...prev,
+            [completionTask.id]: "Done",
+          }));
+        } else {
+          const response = await fetch("/api/google-tasks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              taskId: completionTask.googleTaskId,
+              currentListId,
+              targetListId: completedOption.id,
+            }),
+          });
+
+          const data = await response.json().catch(() => null);
+
+          if (!response.ok) {
+            const message = data?.error || "Failed to move the Google Task to Completed tasks.";
+            throw new Error(message);
+          }
+
+          const newTaskId = data?.task?.id || completionTask.googleTaskId;
+          const newTaskListId = data?.task?.tasklist || completedOption.id;
+          const nextStatus = data?.task?.status || completionTask.status;
+          const nextTaskId = `google-${newTaskId}`;
+
+          setTasks((prev) =>
+            prev.map((item) => {
+              if (item.id !== completionTask.id) {
+                return item;
+              }
+
+              return {
+                ...item,
+                id: nextTaskId,
+                googleTaskId: newTaskId,
+                googleTaskListId: newTaskListId,
+                pipelineId: newTaskListId,
+                pipelineName: completedOption.name,
+                repo: completedOption.name,
+                status: nextStatus,
+              };
+            })
+          );
+
+          setTaskStages((prev) => {
+            const next = { ...prev };
+            delete next[completionTask.id];
+            next[nextTaskId] = "Done";
+            return next;
+          });
+        }
+      } else if (completionTask.source === "Trello" || completionTask.source === "Fellow") {
+        const completedOption = findPipelineOption(completionTask, "Completed");
+
+        if (!completedOption) {
+          throw new Error("Couldn't find a \"Completed\" list for this card.");
+        }
+
+        if (completedOption.id === completionTask.trelloListId) {
+          if (trimmedNote) {
+            const commentResponse = await fetch("/api/trello", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "comment",
+                cardId: completionTask.trelloCardId,
+                comment: trimmedNote,
+              }),
+            });
+
+            const commentData = await commentResponse.json().catch(() => null);
+
+            if (!commentResponse.ok) {
+              const message = commentData?.error || "Adding the comment to Trello failed.";
+              throw new Error(message);
+            }
+          }
+
+          setTasks((prev) =>
+            prev.map((item) => {
+              if (item.id !== completionTask.id) {
+                return item;
+              }
+
+              return {
+                ...item,
+                pipelineName: completedOption.name,
+              };
+            })
+          );
+
+          setTaskStages((prev) => ({
+            ...prev,
+            [completionTask.id]: "Done",
+          }));
+        } else {
+          const response = await fetch("/api/trello", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "move",
+              cardId: completionTask.trelloCardId,
+              targetListId: completedOption.id,
+            }),
+          });
+
+          const data = await response.json().catch(() => null);
+
+          if (!response.ok) {
+            const message = data?.error || "Failed to move the Trello card to Completed.";
+            throw new Error(message);
+          }
+
+          if (trimmedNote) {
+            const commentResponse = await fetch("/api/trello", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "comment",
+                cardId: completionTask.trelloCardId,
+                comment: trimmedNote,
+              }),
+            });
+
+            const commentData = await commentResponse.json().catch(() => null);
+
+            if (!commentResponse.ok) {
+              const message = commentData?.error || "The card was moved but adding the comment failed.";
+              throw new Error(message);
+            }
+          }
+
+          setTasks((prev) =>
+            prev.map((item) => {
+              if (item.id !== completionTask.id) {
+                return item;
+              }
+
+              return {
+                ...item,
+                pipelineId: completedOption.id,
+                pipelineName: completedOption.name,
+                trelloListId: completedOption.id,
+              };
+            })
+          );
+
+          setTaskStages((prev) => ({
+            ...prev,
+            [completionTask.id]: "Done",
+          }));
+        }
+      } else {
+        setTaskStages((prev) => ({
+          ...prev,
+          [completionTask.id]: "Done",
+        }));
+      }
+
+      closeCompletionModal();
+    } catch (error) {
+      const message = error?.message || "We couldn't finish completing this task.";
+      setCompletionModal((prev) => ({
+        ...prev,
+        submitting: false,
+        error: message,
+      }));
+    }
+  };
+
+  const openCompletionModal = (taskId, previousStage) => {
+    setCompletionModal({
+      taskId,
+      note: "",
+      error: "",
+      submitting: false,
+      previousStage,
+    });
+  };
+
+  const closeCompletionModal = () => {
+    setCompletionModal({
+      taskId: null,
+      note: "",
+      error: "",
+      submitting: false,
+      previousStage: null,
+    });
+  };
+
+  const completionTask = useMemo(
+    () => tasks.find((task) => task.id === completionModal.taskId) || null,
+    [tasks, completionModal.taskId]
+  );
+
+  const previousStageLabel =
+    completionModal.previousStage && completionModal.previousStage !== "Done"
+      ? completionModal.previousStage
+      : null;
+
   const handleDrop = (stage) => (event) => {
     event.preventDefault();
     if (!draggedTaskId) {
+      return;
+    }
+
+    const task = tasks.find((item) => item.id === draggedTaskId) || null;
+    const previousStage = taskStages[draggedTaskId] || deriveInitialStage(task);
+
+    setDraggedTaskId(null);
+    setDragOverStage(null);
+
+    if (stage === "Done" && isManagedCompletionTask(task)) {
+      openCompletionModal(draggedTaskId, previousStage);
       return;
     }
 
@@ -102,8 +431,6 @@ export default function KanbanBoard() {
       ...prev,
       [draggedTaskId]: stage,
     }));
-    setDraggedTaskId(null);
-    setDragOverStage(null);
   };
 
   const handleDragOver = (stage) => (event) => {
@@ -256,6 +583,71 @@ export default function KanbanBoard() {
           );
         })}
       </div>
+
+      {completionTask && (
+        <div className="kanban-board__modal-backdrop">
+          <div
+            className="kanban-board__modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="kanban-complete-title"
+          >
+            <h2 id="kanban-complete-title" className="kanban-board__modal-title">
+              Complete this task?
+            </h2>
+            <p className="kanban-board__modal-message">
+              You&apos;re about to move <strong>{completionTask.title || completionTask.name}</strong>
+              {previousStageLabel ? (
+                <>
+                  {" from "}
+                  <span className="kanban-board__modal-stage">{previousStageLabel}</span>
+                  {" to the Done column."}
+                </>
+              ) : (
+                " to the Done column."
+              )}{" "}
+              Add a quick note about the completion and confirm to finish.
+            </p>
+
+            <label className="kanban-board__modal-label" htmlFor="kanban-complete-note">
+              Completion note (optional)
+            </label>
+            <textarea
+              id="kanban-complete-note"
+              className="kanban-board__modal-textarea"
+              rows={4}
+              value={completionModal.note}
+              onChange={handleModalNoteChange}
+              disabled={completionModal.submitting}
+            />
+
+            {completionModal.error && (
+              <p className="kanban-board__modal-error" role="alert">
+                {completionModal.error}
+              </p>
+            )}
+
+            <div className="kanban-board__modal-actions">
+              <button
+                type="button"
+                className="kanban-board__modal-button kanban-board__modal-button--secondary"
+                onClick={closeCompletionModal}
+                disabled={completionModal.submitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="kanban-board__modal-button kanban-board__modal-button--primary"
+                onClick={confirmCompletion}
+                disabled={completionModal.submitting}
+              >
+                {completionModal.submitting ? "Completing…" : "Confirm completion"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
