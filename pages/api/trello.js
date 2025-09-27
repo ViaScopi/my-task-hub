@@ -188,7 +188,32 @@ function mapCardsToTasks(cards, boardLists = new Map()) {
     const title = card.name?.trim() || "Untitled card";
     const description = card.desc?.trim() || "";
     const boardName = card.board?.name?.trim();
-    const listName = card.list?.name?.trim();
+    const boardId = typeof card.idBoard === "string" ? card.idBoard.trim() : "";
+
+    let listName = typeof card.list?.name === "string" ? card.list.name.trim() : "";
+    const cardListId = typeof card.idList === "string" ? card.idList.trim() : "";
+
+    if (!listName && boardId && cardListId) {
+      const listsForBoard = boardLists.get(boardId) || [];
+
+      for (const list of listsForBoard) {
+        const listId = typeof list?.id === "string" ? list.id.trim() : "";
+
+        if (listId && listId === cardListId) {
+          listName = typeof list?.name === "string" ? list.name.trim() : "";
+          if (listName) {
+            break;
+          }
+        }
+      }
+    }
+
+    const normalizedListName = listName.toLowerCase();
+
+    if (normalizedListName === "completed") {
+      continue;
+    }
+
     const due = card.due || null;
 
     let status = "";
@@ -198,7 +223,6 @@ function mapCardsToTasks(cards, boardLists = new Map()) {
       status = "Closed";
     }
 
-    const boardId = typeof card.idBoard === "string" ? card.idBoard.trim() : "";
     const pipelineOptions = boardId
       ? mapListsToOptions(boardLists.get(boardId))
       : [];
