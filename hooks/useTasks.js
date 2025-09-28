@@ -1,4 +1,142 @@
 import { useCallback, useEffect, useState } from "react";
+import { buildTaskKey, deriveOriginalId } from "../lib/taskIdentity.js";
+
+function ensureOriginalId(task) {
+  const originalId = deriveOriginalId(task);
+  return {
+    ...task,
+    originalId,
+  };
+}
+
+function normalizeCompletedSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") {
+    return null;
+  }
+
+  const source = snapshot.source || "Other";
+  const originalId = snapshot.originalId ?? deriveOriginalId(snapshot);
+
+  const base = {
+    id: snapshot.id || snapshot.taskId,
+    source,
+    originalId,
+    title: snapshot.title || snapshot.name || "Untitled task",
+    name: snapshot.name || snapshot.title || "Untitled task",
+    repo: snapshot.repo || null,
+    pipelineId: snapshot.pipelineId || null,
+    pipelineName: snapshot.pipelineName || snapshot.repo || null,
+    description: snapshot.description || "",
+    url: snapshot.url || null,
+    notes: snapshot.notes || "",
+    completedAt: snapshot.completedAt || snapshot.updatedAt || null,
+    status: snapshot.status || "Completed locally",
+    locallyCompleted: true,
+  };
+
+  if (snapshot.issue_number) {
+    base.issue_number = snapshot.issue_number;
+  }
+
+  if (snapshot.googleTaskId) {
+    base.googleTaskId = snapshot.googleTaskId;
+  }
+
+  if (snapshot.googleTaskListId) {
+    base.googleTaskListId = snapshot.googleTaskListId;
+    base.pipelineId = base.pipelineId || snapshot.googleTaskListId;
+  }
+
+  if (snapshot.trelloCardId) {
+    base.trelloCardId = snapshot.trelloCardId;
+  }
+
+  if (snapshot.trelloListId) {
+    base.trelloListId = snapshot.trelloListId;
+    base.pipelineId = base.pipelineId || snapshot.trelloListId;
+  }
+
+  if (snapshot.fellowActionId) {
+    base.fellowActionId = snapshot.fellowActionId;
+  }
+
+  return ensureOriginalId(base);
+}
+
+export function mergeTasksWithCompletions(integrationTasks = [], completedSnapshots = []) {
+  const map = new Map();
+  const ordered = [];
+
+  const upsertTask = (task, { markCompleted = false } = {}) => {
+    if (!task || typeof task !== "object") {
+      return;
+    }
+
+    const normalizedTask = ensureOriginalId(task);
+    const key = buildTaskKey(normalizedTask.source, normalizedTask.originalId);
+
+    if (!key) {
+      return;
+    }
+
+    const existing = map.get(key);
+    const completedStatus = markCompleted
+      ? normalizedTask.status || "Completed locally"
+      : normalizedTask.status;
+
+    if (existing) {
+      const mergedTask = {
+        ...existing.task,
+        ...normalizedTask,
+      };
+
+      if (markCompleted) {
+        mergedTask.locallyCompleted = true;
+        mergedTask.status = completedStatus || existing.task.status || "Completed locally";
+        mergedTask.completedAt =
+          normalizedTask.completedAt || existing.task.completedAt || new Date().toISOString();
+        mergedTask.notes = normalizedTask.notes ?? existing.task.notes;
+        mergedTask.id = existing.task.id || normalizedTask.id || mergedTask.id;
+      }
+
+      const preserveFields = ["url", "repo", "pipelineName", "pipelineId", "description", "title", "name"];
+      for (const field of preserveFields) {
+        if (mergedTask[field] == null && existing.task[field] != null) {
+          mergedTask[field] = existing.task[field];
+        }
+      }
+
+      ordered[existing.index] = mergedTask;
+      map.set(key, { index: existing.index, task: mergedTask });
+      return;
+    }
+
+    const entry = { ...normalizedTask };
+
+    if (markCompleted) {
+      entry.locallyCompleted = true;
+      entry.status = completedStatus || "Completed locally";
+      entry.completedAt = entry.completedAt || new Date().toISOString();
+    }
+
+    if (!entry.id) {
+      entry.id = `completed-${key.replace(/[^a-zA-Z0-9]/g, "-")}`;
+    }
+
+    ordered.push(entry);
+    map.set(key, { index: ordered.length - 1, task: entry });
+  };
+
+  integrationTasks.forEach((task) => upsertTask(task));
+  completedSnapshots
+    .map((snapshot) => normalizeCompletedSnapshot(snapshot))
+    .filter(Boolean)
+    .forEach((snapshotTask) => {
+      upsertTask(snapshotTask, { markCompleted: true });
+    });
+
+  return ordered;
+}
 
 export function useTasks() {
   const [tasks, setTasks] = useState([]);
@@ -47,15 +185,28 @@ export function useTasks() {
 
             return Array.isArray(data) ? data : [];
           }),
+          fetch("/api/completed-tasks", { signal }).then(async (response) => {
+            const data = await response.json().catch(() => null);
+
+            if (!response.ok) {
+              const error = new Error(data?.error || "Failed to load completed task history.");
+              error.status = response.status;
+              throw error;
+            }
+
+            return Array.isArray(data) ? data : [];
+          }),
         ];
 
-        const [githubResult, googleResult, trelloResult] = await Promise.allSettled(requests);
+        const [githubResult, googleResult, trelloResult, completedResult] =
+          await Promise.allSettled(requests);
 
         if (signal?.aborted) {
           return;
         }
 
-        const combinedTasks = [];
+        const integrationTasks = [];
+        const completedSnapshots = [];
         const errors = [];
 
         if (githubResult.status === "fulfilled") {
@@ -63,14 +214,14 @@ export function useTasks() {
             ...task,
             id: task.id ?? `github-${task.issue_number}`,
           }));
-          combinedTasks.push(...githubTasks);
+          integrationTasks.push(...githubTasks);
         } else {
           errors.push("GitHub tasks");
           console.error("Failed to load GitHub tasks:", githubResult.reason);
         }
 
         if (googleResult.status === "fulfilled") {
-          combinedTasks.push(...googleResult.value);
+          integrationTasks.push(...googleResult.value);
         } else {
           const isConfigError = googleResult.reason?.status === 503;
           errors.push(isConfigError ? "Google Tasks (integration not configured)" : "Google Tasks");
@@ -78,14 +229,23 @@ export function useTasks() {
         }
 
         if (trelloResult.status === "fulfilled") {
-          combinedTasks.push(...trelloResult.value);
+          integrationTasks.push(...trelloResult.value);
         } else {
           const isConfigError = trelloResult.reason?.status === 503;
           errors.push(isConfigError ? "Trello (integration not configured)" : "Trello");
           console.error("Failed to load Trello cards:", trelloResult.reason);
         }
 
-        setTasks(combinedTasks);
+        if (completedResult.status === "fulfilled") {
+          completedSnapshots.push(...completedResult.value);
+        } else {
+          errors.push("Completed tasks history");
+          console.error("Failed to load completed task history:", completedResult.reason);
+        }
+
+        const mergedTasks = mergeTasksWithCompletions(integrationTasks, completedSnapshots);
+
+        setTasks(mergedTasks);
 
         if (errors.length === 1) {
           setFetchError(`Heads up: ${errors[0]} couldn't be loaded right now.`);
