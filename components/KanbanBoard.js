@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { deriveOriginalId } from "../lib/taskIdentity.js";
 import { useTasks } from "../hooks/useTasks";
 
 const STAGES = ["Backlog", "In Progress", "Review", "Done"];
@@ -57,6 +58,71 @@ function deriveInitialStage(task) {
 
 function getSourceKey(task) {
   return task?.source || "Other";
+}
+
+async function persistCompletedTaskSnapshot(task, note, overrides = {}) {
+  const originalId = deriveOriginalId(task);
+
+  if (!originalId) {
+    throw new Error("Unable to determine a stable identifier for this task.");
+  }
+
+  const timestamp = overrides.completedAt || new Date().toISOString();
+  const payload = {
+    source: task.source || "Other",
+    originalId,
+    id: task.id,
+    title: task.title || task.name || "Untitled task",
+    notes: note || "",
+    completedAt: timestamp,
+    updatedAt: overrides.updatedAt || timestamp,
+    repo: task.repo || null,
+    pipelineId: task.pipelineId || null,
+    pipelineName: task.pipelineName || null,
+    url: task.url || null,
+    description: task.description || "",
+    status: overrides.status || task.status || "Completed locally",
+    locallyCompleted: true,
+  };
+
+  if (task.issue_number) {
+    payload.issue_number = task.issue_number;
+  }
+
+  if (task.googleTaskId) {
+    payload.googleTaskId = task.googleTaskId;
+  }
+
+  if (task.googleTaskListId) {
+    payload.googleTaskListId = task.googleTaskListId;
+  }
+
+  if (task.trelloCardId) {
+    payload.trelloCardId = task.trelloCardId;
+  }
+
+  if (task.trelloListId) {
+    payload.trelloListId = task.trelloListId;
+  }
+
+  if (task.fellowActionId) {
+    payload.fellowActionId = task.fellowActionId;
+  }
+
+  const response = await fetch("/api/completed-tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = data?.error || "Failed to persist the completed task snapshot.";
+    throw new Error(message);
+  }
+
+  return data;
 }
 
 export default function KanbanBoard() {
@@ -148,6 +214,11 @@ export default function KanbanBoard() {
     }));
 
     try {
+      const completedAt = new Date().toISOString();
+      let nextTaskVersion = null;
+      let updateTasks = null;
+      let updateStages = null;
+
       if (completionTask.source === "GitHub") {
         const repoSlug = completionTask.repo || "";
         const [owner, repo] = repoSlug.split("/");
@@ -174,12 +245,19 @@ export default function KanbanBoard() {
           throw new Error(message);
         }
 
-        setTasks((prev) => prev.filter((item) => item.id !== completionTask.id));
-        setTaskStages((prev) => {
-          const next = { ...prev };
-          delete next[completionTask.id];
-          return next;
-        });
+        nextTaskVersion = {
+          ...completionTask,
+          status: "Completed locally",
+          locallyCompleted: true,
+          completedAt,
+        };
+
+        if (trimmedNote) {
+          nextTaskVersion.completionNote = trimmedNote;
+        }
+
+        updateTasks = (prev) =>
+          prev.map((item) => (item.id === completionTask.id ? nextTaskVersion : item));
       } else if (completionTask.source === "Google Tasks") {
         const completedOption = findPipelineOption(completionTask, "Completed tasks");
 
@@ -194,24 +272,17 @@ export default function KanbanBoard() {
         }
 
         if (completedOption.id === currentListId) {
-          setTasks((prev) =>
-            prev.map((item) => {
-              if (item.id !== completionTask.id) {
-                return item;
-              }
+          nextTaskVersion = {
+            ...completionTask,
+            pipelineName: completedOption.name,
+            repo: completedOption.name,
+            status: "completed",
+            locallyCompleted: true,
+            completedAt,
+          };
 
-              return {
-                ...item,
-                pipelineName: completedOption.name,
-                repo: completedOption.name,
-              };
-            })
-          );
-
-          setTaskStages((prev) => ({
-            ...prev,
-            [completionTask.id]: "Done",
-          }));
+          updateTasks = (prev) =>
+            prev.map((item) => (item.id === completionTask.id ? nextTaskVersion : item));
         } else {
           const response = await fetch("/api/google-tasks", {
             method: "POST",
@@ -232,34 +303,31 @@ export default function KanbanBoard() {
 
           const newTaskId = data?.task?.id || completionTask.googleTaskId;
           const newTaskListId = data?.task?.tasklist || completedOption.id;
-          const nextStatus = data?.task?.status || completionTask.status;
+          const nextStatus = data?.task?.status || "completed";
           const nextTaskId = `google-${newTaskId}`;
 
-          setTasks((prev) =>
-            prev.map((item) => {
-              if (item.id !== completionTask.id) {
-                return item;
-              }
+          nextTaskVersion = {
+            ...completionTask,
+            id: nextTaskId,
+            googleTaskId: newTaskId,
+            googleTaskListId: newTaskListId,
+            pipelineId: newTaskListId,
+            pipelineName: completedOption.name,
+            repo: completedOption.name,
+            status: nextStatus,
+            locallyCompleted: true,
+            completedAt,
+          };
 
-              return {
-                ...item,
-                id: nextTaskId,
-                googleTaskId: newTaskId,
-                googleTaskListId: newTaskListId,
-                pipelineId: newTaskListId,
-                pipelineName: completedOption.name,
-                repo: completedOption.name,
-                status: nextStatus,
-              };
-            })
-          );
+          updateTasks = (prev) =>
+            prev.map((item) => (item.id === completionTask.id ? nextTaskVersion : item));
 
-          setTaskStages((prev) => {
+          updateStages = (prev) => {
             const next = { ...prev };
             delete next[completionTask.id];
             next[nextTaskId] = "Done";
             return next;
-          });
+          };
         }
       } else if (completionTask.source === "Trello" || completionTask.source === "Fellow") {
         const completedOption = findPipelineOption(completionTask, "Completed");
@@ -288,23 +356,16 @@ export default function KanbanBoard() {
             }
           }
 
-          setTasks((prev) =>
-            prev.map((item) => {
-              if (item.id !== completionTask.id) {
-                return item;
-              }
+          nextTaskVersion = {
+            ...completionTask,
+            pipelineName: completedOption.name,
+            status: "completed",
+            locallyCompleted: true,
+            completedAt,
+          };
 
-              return {
-                ...item,
-                pipelineName: completedOption.name,
-              };
-            })
-          );
-
-          setTaskStages((prev) => ({
-            ...prev,
-            [completionTask.id]: "Done",
-          }));
+          updateTasks = (prev) =>
+            prev.map((item) => (item.id === completionTask.id ? nextTaskVersion : item));
         } else {
           const response = await fetch("/api/trello", {
             method: "POST",
@@ -342,32 +403,67 @@ export default function KanbanBoard() {
             }
           }
 
-          setTasks((prev) =>
-            prev.map((item) => {
-              if (item.id !== completionTask.id) {
-                return item;
-              }
+          nextTaskVersion = {
+            ...completionTask,
+            pipelineId: completedOption.id,
+            pipelineName: completedOption.name,
+            trelloListId: completedOption.id,
+            status: "completed",
+            locallyCompleted: true,
+            completedAt,
+          };
 
-              return {
-                ...item,
-                pipelineId: completedOption.id,
-                pipelineName: completedOption.name,
-                trelloListId: completedOption.id,
-              };
-            })
-          );
-
-          setTaskStages((prev) => ({
-            ...prev,
-            [completionTask.id]: "Done",
-          }));
+          updateTasks = (prev) =>
+            prev.map((item) => (item.id === completionTask.id ? nextTaskVersion : item));
         }
       } else {
-        setTaskStages((prev) => ({
-          ...prev,
-          [completionTask.id]: "Done",
-        }));
+        nextTaskVersion = {
+          ...completionTask,
+          status: completionTask.status || "Completed locally",
+          locallyCompleted: true,
+          completedAt,
+        };
+
+        updateTasks = (prev) =>
+          prev.map((item) => (item.id === completionTask.id ? nextTaskVersion : item));
       }
+
+      if (!nextTaskVersion) {
+        nextTaskVersion = {
+          ...completionTask,
+          status: "Completed locally",
+          locallyCompleted: true,
+          completedAt,
+        };
+
+        updateTasks = (prev) =>
+          prev.map((item) => (item.id === completionTask.id ? nextTaskVersion : item));
+      }
+
+      const originalId = deriveOriginalId(nextTaskVersion);
+      nextTaskVersion = {
+        ...nextTaskVersion,
+        originalId,
+      };
+
+      if (!updateStages) {
+        updateStages = (prev) => {
+          const next = { ...prev };
+          if (nextTaskVersion.id !== completionTask.id) {
+            delete next[completionTask.id];
+          }
+          next[nextTaskVersion.id] = "Done";
+          return next;
+        };
+      }
+
+      await persistCompletedTaskSnapshot(nextTaskVersion, trimmedNote, {
+        completedAt,
+        status: nextTaskVersion.status,
+      });
+
+      setTasks((prev) => updateTasks(prev));
+      setTaskStages((prev) => updateStages(prev));
 
       closeCompletionModal();
     } catch (error) {
