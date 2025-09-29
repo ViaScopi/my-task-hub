@@ -1,8 +1,8 @@
+import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { useAuth } from "../context/AuthContext";
 
 export default function Home() {
-  const { user } = useAuth();
+  const { isSignedIn } = useUser();
 
   return (
     <main className="home">
@@ -15,7 +15,7 @@ export default function Home() {
           to prioritize the next win.
         </p>
         <div className="home__actions">
-          {user ? (
+          {isSignedIn ? (
             <>
               <Link href="/dashboard" className="button button--primary">
                 Go to dashboard
