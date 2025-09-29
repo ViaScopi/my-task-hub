@@ -1,6 +1,7 @@
 import { SignedIn, SignedOut, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useMemo } from "react";
+import EventList from "../components/EventList";
 import TaskList from "../components/TaskList";
 
 export default function DashboardPage() {
@@ -42,9 +43,14 @@ export default function DashboardPage() {
               Trello.
             </p>
           </section>
-          <section className="dashboard__tasks" aria-label="Task rundown">
-            <TaskList />
-          </section>
+          <div className="dashboard__columns">
+            <section className="dashboard__tasks" aria-label="Task rundown">
+              <TaskList />
+            </section>
+            <section className="dashboard__events" aria-label="Calendar rundown">
+              <EventList />
+            </section>
+          </div>
         </main>
       </SignedIn>
     </>
