@@ -680,6 +680,17 @@ main {
   box-shadow: var(--shadow);
 }
 
+.auth-card__title {
+  margin: 0;
+  font-size: 1.8rem;
+  color: var(--slate-900);
+}
+
+.auth-card__description {
+  margin: 0;
+  color: var(--slate-600);
+}
+
 .auth-card h1 {
   margin: 0;
   font-size: 1.8rem;

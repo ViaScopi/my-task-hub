@@ -1,58 +1,41 @@
-import { useEffect, useState } from "react";
+import { SignIn, useUser } from "@clerk/nextjs";
+import { useEffect } from "react";
 import { useRouter } from "next/router";
-import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, login } = useAuth();
-  const [name, setName] = useState("");
-  const [error, setError] = useState("");
+  const { isLoaded, isSignedIn } = useUser();
 
   useEffect(() => {
-    if (user) {
+    if (isLoaded && isSignedIn) {
       router.replace("/dashboard");
     }
-  }, [router, user]);
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-
-    if (!name.trim()) {
-      setError("Please enter your name to continue.");
-      return;
-    }
-
-    login(name);
-    router.push("/dashboard");
-  };
+  }, [isLoaded, isSignedIn, router]);
 
   return (
     <main className="auth">
-      <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>Log in to My Task Hub</h1>
-        <p>We&apos;ll remember you on this device until you log out.</p>
-
-        <label htmlFor="login-name" className="auth-card__label">
-          Display name
-        </label>
-        <input
-          id="login-name"
-          type="text"
-          className="auth-card__input"
-          value={name}
-          onChange={(event) => {
-            setName(event.target.value);
-            setError("");
-          }}
-          placeholder="Jane Doe"
-          autoComplete="name"
-        />
-        {error && <p className="auth-card__error">{error}</p>}
-
-        <button type="submit" className="button button--primary auth-card__submit">
-          Continue
-        </button>
-      </form>
+      <SignIn
+        path="/login"
+        routing="path"
+        signUpUrl="/login"
+        afterSignInUrl="/dashboard"
+        afterSignUpUrl="/dashboard"
+        appearance={{
+          elements: {
+            card: "auth-card auth-card--clerk",
+            headerTitle: "auth-card__title",
+            headerSubtitle: "auth-card__description",
+            formButtonPrimary: "button button--primary auth-card__submit",
+            socialButtonsBlockButton: "button button--ghost",
+          },
+          variables: {
+            colorPrimary: "#6366f1",
+            colorText: "var(--slate-700)",
+            colorTextSecondary: "var(--slate-600)",
+            borderRadius: "24px",
+          },
+        }}
+      />
     </main>
   );
 }

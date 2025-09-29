@@ -1,7 +1,7 @@
+import { SignedIn, SignedOut, SignOutButton, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useMemo } from "react";
-import { useAuth } from "../context/AuthContext";
 
 const NAV_LINKS = [
   { href: "/", label: "Home", requiresAuth: false },
@@ -10,17 +10,26 @@ const NAV_LINKS = [
 ];
 
 export default function Layout({ children }) {
-  const { user, logout } = useAuth();
+  const { user, isSignedIn } = useUser();
   const router = useRouter();
 
   const navigationLinks = useMemo(() => {
-    return NAV_LINKS.filter((link) => (link.requiresAuth ? Boolean(user) : true));
-  }, [user]);
+    return NAV_LINKS.filter((link) => (link.requiresAuth ? Boolean(isSignedIn) : true));
+  }, [isSignedIn]);
 
-  const handleLogout = () => {
-    logout();
-    router.push("/");
-  };
+  const displayName = useMemo(() => {
+    if (!user) {
+      return "there";
+    }
+
+    return (
+      user.fullName ||
+      user.firstName ||
+      user.username ||
+      user.primaryEmailAddress?.emailAddress ||
+      "there"
+    );
+  }, [user]);
 
   return (
     <div className="app-shell">
@@ -47,24 +56,21 @@ export default function Layout({ children }) {
           </nav>
 
           <div className="site-header__actions">
-            {user ? (
-              <>
-                <span className="site-header__user" aria-live="polite">
-                  Hi, {user.name}
-                </span>
-                <button
-                  type="button"
-                  className="button button--ghost site-header__button"
-                  onClick={handleLogout}
-                >
+            <SignedIn>
+              <span className="site-header__user" aria-live="polite">
+                Hi, {displayName}
+              </span>
+              <SignOutButton signOutRedirectUrl="/">
+                <button type="button" className="button button--ghost site-header__button">
                   Log out
                 </button>
-              </>
-            ) : (
+              </SignOutButton>
+            </SignedIn>
+            <SignedOut>
               <Link href="/login" className="button button--primary site-header__button">
                 Log in
               </Link>
-            )}
+            </SignedOut>
           </div>
         </div>
       </header>
