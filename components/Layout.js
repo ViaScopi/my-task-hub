@@ -7,7 +7,6 @@ const NAV_LINKS = [
   { href: "/", label: "Home", requiresAuth: false },
   { href: "/dashboard", label: "Dashboard", requiresAuth: true },
   { href: "/calendar", label: "Calendar", requiresAuth: true },
-  { href: "/comms-dashboard", label: "Comms Dashboard", requiresAuth: true },
   { href: "/kanban", label: "Kanban Board", requiresAuth: true },
 ];
 
