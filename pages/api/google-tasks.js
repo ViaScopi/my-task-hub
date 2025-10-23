@@ -1,71 +1,24 @@
+import { createClient } from "../../lib/supabase/api";
+import { getValidAccessToken } from "../../lib/google-auth";
+
 const TASKS_BASE_URL = "https://tasks.googleapis.com/tasks/v1";
-const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 
-const MISSING_CREDENTIALS_ERROR = "MISSING_GOOGLE_TASKS_CREDENTIALS";
+async function getConfiguredListIds(supabase, userId) {
+  // Get user preferences for which task lists to show
+  const { data, error } = await supabase
+    .from("user_preferences")
+    .select("google_tasks_list_ids")
+    .eq("user_id", userId)
+    .single();
 
-function getConfiguredListIds() {
-  const raw = process.env.GOOGLE_TASKS_LIST_IDS;
-
-  if (!raw) {
-    return [];
+  if (error || !data || !data.google_tasks_list_ids) {
+    return []; // Show all lists if no preference set
   }
 
-  return raw
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
+  return data.google_tasks_list_ids;
 }
 
-function getOAuthConfig() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-
-  if (!clientId || !clientSecret || !refreshToken) {
-    const error = new Error(
-      "Google Tasks integration is not configured. Please provide GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN environment variables."
-    );
-    error.code = MISSING_CREDENTIALS_ERROR;
-    throw error;
-  }
-
-  return { clientId, clientSecret, refreshToken };
-}
-
-async function getAccessToken() {
-  const { clientId, clientSecret, refreshToken } = getOAuthConfig();
-
-  const body = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    refresh_token: refreshToken,
-    grant_type: "refresh_token",
-  });
-
-  const response = await fetch(TOKEN_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-
-  if (!response.ok) {
-    const data = await response.json().catch(() => null);
-    const message = data?.error_description || data?.error || "Failed to refresh Google access token.";
-    throw new Error(message);
-  }
-
-  const data = await response.json();
-  const accessToken = data?.access_token;
-
-  if (!accessToken) {
-    throw new Error("Google access token response did not include an access_token.");
-  }
-
-  return accessToken;
-}
-
-async function fetchTaskLists(accessToken) {
-  const configuredIds = getConfiguredListIds();
+async function fetchTaskLists(accessToken, configuredIds = []) {
   const lists = [];
   let pageToken;
 
@@ -184,10 +137,23 @@ function buildInsertPayload(task) {
 }
 
 export default async function handler(req, res) {
+  const supabase = createClient(req, res);
+
+  // Get authenticated user
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   if (req.method === "GET") {
     try {
-      const accessToken = await getAccessToken();
-      const lists = await fetchTaskLists(accessToken);
+      const accessToken = await getValidAccessToken(supabase, user.id);
+      const configuredListIds = await getConfiguredListIds(supabase, user.id);
+      const lists = await fetchTaskLists(accessToken, configuredListIds);
 
       if (!lists.length) {
         return res.status(200).json([]);
@@ -217,10 +183,6 @@ export default async function handler(req, res) {
 
       return res.status(200).json(tasks);
     } catch (error) {
-      if (error.code === MISSING_CREDENTIALS_ERROR) {
-        return res.status(503).json({ error: error.message });
-      }
-
       console.error("Google Tasks API error:", error);
       return res.status(500).json({ error: error.message || "Failed to load Google Tasks." });
     }
@@ -241,7 +203,7 @@ export default async function handler(req, res) {
         });
       }
 
-      const accessToken = await getAccessToken();
+      const accessToken = await getValidAccessToken(supabase, user.id);
 
       const currentTaskResponse = await fetch(
         `${TASKS_BASE_URL}/lists/${encodeURIComponent(currentListId)}/tasks/${encodeURIComponent(taskId)}`,
@@ -302,10 +264,6 @@ export default async function handler(req, res) {
         },
       });
     } catch (error) {
-      if (error.code === MISSING_CREDENTIALS_ERROR) {
-        return res.status(503).json({ error: error.message });
-      }
-
       console.error("Error updating Google Task pipeline:", error);
       return res.status(500).json({ error: error.message || "Failed to update Google Task." });
     }

@@ -1,21 +1,23 @@
-import { SignedIn, SignedOut, SignOutButton, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useMemo } from "react";
+import { useAuth } from "../pages/_app";
 
 const NAV_LINKS = [
   { href: "/", label: "Home", requiresAuth: false },
   { href: "/dashboard", label: "Dashboard", requiresAuth: true },
   { href: "/calendar", label: "Calendar", requiresAuth: true },
   { href: "/kanban", label: "Kanban Board", requiresAuth: true },
+  { href: "/settings", label: "Settings", requiresAuth: true },
 ];
 
 export default function Layout({ children }) {
-  const { user, isSignedIn } = useUser();
+  const { user, signOut } = useAuth();
   const router = useRouter();
+  const isSignedIn = Boolean(user);
 
   const navigationLinks = useMemo(() => {
-    return NAV_LINKS.filter((link) => (link.requiresAuth ? Boolean(isSignedIn) : true));
+    return NAV_LINKS.filter((link) => (link.requiresAuth ? isSignedIn : true));
   }, [isSignedIn]);
 
   const displayName = useMemo(() => {
@@ -23,14 +25,20 @@ export default function Layout({ children }) {
       return "there";
     }
 
+    // Use user metadata if available
+    const metadata = user.user_metadata || {};
     return (
-      user.fullName ||
-      user.firstName ||
-      user.username ||
-      user.primaryEmailAddress?.emailAddress ||
+      metadata.full_name ||
+      metadata.name ||
+      user.email?.split("@")[0] ||
       "there"
     );
   }, [user]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/");
+  };
 
   return (
     <div className="app-shell">
@@ -57,21 +65,24 @@ export default function Layout({ children }) {
           </nav>
 
           <div className="site-header__actions">
-            <SignedIn>
-              <span className="site-header__user" aria-live="polite">
-                Hi, {displayName}
-              </span>
-              <SignOutButton signOutRedirectUrl="/">
-                <button type="button" className="button button--ghost site-header__button">
+            {isSignedIn ? (
+              <>
+                <span className="site-header__user" aria-live="polite">
+                  Hi, {displayName}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="button button--ghost site-header__button"
+                >
                   Log out
                 </button>
-              </SignOutButton>
-            </SignedIn>
-            <SignedOut>
+              </>
+            ) : (
               <Link href="/login" className="button button--primary site-header__button">
                 Log in
               </Link>
-            </SignedOut>
+            )}
           </div>
         </div>
       </header>
