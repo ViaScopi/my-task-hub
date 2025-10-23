@@ -1,7 +1,46 @@
+import { createClient } from "../../lib/supabase/api";
+
 const DEFAULT_BASE_URL = "https://api.trello.com/1";
 const DEFAULT_LIMIT = 200;
 
-const MISSING_CREDENTIALS_ERROR = "MISSING_TRELLO_CREDENTIALS";
+async function getUserTrelloAuth(supabase, userId) {
+  // Get user's Trello integration from database
+  const { data, error } = await supabase
+    .from("user_integrations")
+    .select("access_token, metadata")
+    .eq("user_id", userId)
+    .eq("provider", "trello")
+    .single();
+
+  if (error || !data) {
+    throw new Error("Trello not connected. Please connect your Trello account in Settings.");
+  }
+
+  const apiKey = process.env.TRELLO_API_KEY;
+  if (!apiKey) {
+    throw new Error("Trello API key not configured on server.");
+  }
+
+  return {
+    key: apiKey,
+    token: data.access_token,
+    username: data.metadata?.username || null,
+  };
+}
+
+async function getTrelloMemberId(key, token) {
+  // Fetch current member info to get member ID
+  const response = await fetch(
+    `${DEFAULT_BASE_URL}/members/me?key=${key}&token=${token}&fields=id,username`
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch Trello member information");
+  }
+
+  const data = await response.json();
+  return data.id;
+}
 
 function ensureBaseUrl(rawBaseUrl) {
   let normalized = rawBaseUrl?.trim();
@@ -50,48 +89,6 @@ function buildUrl(baseUrl, path) {
 
 function getBaseUrl() {
   return ensureBaseUrl(process.env.TRELLO_API_BASE_URL);
-}
-
-function ensureConfiguredAuth() {
-  const key = process.env.TRELLO_API_KEY?.trim();
-  const token = process.env.TRELLO_TOKEN?.trim();
-
-  if (!key || !token) {
-    const error = new Error(
-      "Trello integration is not configured. Please provide the TRELLO_API_KEY and TRELLO_TOKEN environment variables."
-    );
-    error.code = MISSING_CREDENTIALS_ERROR;
-    throw error;
-  }
-
-  return { key, token };
-}
-
-function ensureConfiguredMemberId() {
-  const memberId = process.env.TRELLO_MEMBER_ID?.trim();
-
-  if (!memberId) {
-    const error = new Error(
-      "Trello integration is not configured. Please provide the TRELLO_MEMBER_ID environment variable."
-    );
-    error.code = MISSING_CREDENTIALS_ERROR;
-    throw error;
-  }
-
-  return memberId;
-}
-
-function getConfiguredBoardIds() {
-  const raw = process.env.TRELLO_BOARD_IDS;
-
-  if (!raw) {
-    return [];
-  }
-
-  return raw
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
 }
 
 function getCardLimit() {
@@ -250,19 +247,6 @@ function mapCardsToTasks(cards, boardLists = new Map()) {
   return tasks;
 }
 
-function filterCardsByBoard(cards, boardIds) {
-  if (!Array.isArray(cards) || !Array.isArray(boardIds) || boardIds.length === 0) {
-    return Array.isArray(cards) ? cards : [];
-  }
-
-  const normalizedIds = new Set(boardIds.map((id) => id.trim()).filter(Boolean));
-
-  return cards.filter((card) => {
-    const boardId = typeof card?.idBoard === "string" ? card.idBoard.trim() : "";
-    return boardId && normalizedIds.has(boardId);
-  });
-}
-
 async function fetchMemberCards(baseUrl, key, token, memberId, limit) {
   const url = new URL(buildUrl(baseUrl, `members/${encodeURIComponent(memberId)}/cards`));
   url.searchParams.set("key", key);
@@ -417,20 +401,32 @@ async function addCommentToCard(baseUrl, key, token, cardId, comment) {
   }
 }
 
-export async function handler(req, res) {
+export default async function handler(req, res) {
+  const supabase = createClient(req, res);
+
+  // Get authenticated user
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   if (req.method === "GET") {
     try {
-      const { key, token } = ensureConfiguredAuth();
-      const memberId = ensureConfiguredMemberId();
+      // Get user's Trello credentials from database
+      const { key, token } = await getUserTrelloAuth(supabase, user.id);
+      const memberId = await getTrelloMemberId(key, token);
+
       const baseUrl = getBaseUrl();
       const limit = getCardLimit();
-      const boardIds = getConfiguredBoardIds();
 
       const cards = await fetchMemberCards(baseUrl, key, token, memberId, limit);
-      const filteredCards = filterCardsByBoard(cards, boardIds);
 
       const boardIdSet = new Set();
-      for (const card of filteredCards) {
+      for (const card of cards) {
         const boardId = typeof card?.idBoard === "string" ? card.idBoard.trim() : "";
         if (boardId) {
           boardIdSet.add(boardId);
@@ -450,37 +446,31 @@ export async function handler(req, res) {
       );
 
       const boardLists = new Map(boardListEntries);
-      const tasks = mapCardsToTasks(filteredCards, boardLists);
+      const tasks = mapCardsToTasks(cards, boardLists);
 
       return res.status(200).json(tasks);
     } catch (error) {
-      if (error.code === MISSING_CREDENTIALS_ERROR) {
-        return res.status(503).json({ error: error.message });
-      }
+      console.error("Trello API error:", error);
 
       const status = Number.isInteger(error.status) ? error.status : null;
 
       if (status === 401 || status === 403) {
-        console.error("Trello API authentication error:", error);
         return res.status(503).json({
-          error:
-            "Trello integration authentication failed. Please verify the configured TRELLO_API_KEY, TRELLO_TOKEN, and TRELLO_MEMBER_ID.",
+          error: "Trello integration authentication failed. Please reconnect your Trello account in Settings.",
         });
       }
 
       if (status && status >= 400 && status < 600) {
-        console.error("Trello API error:", error);
         return res.status(status).json({ error: error.message || "Failed to load Trello cards." });
       }
 
-      console.error("Trello API error:", error);
       return res.status(500).json({ error: error.message || "Failed to load Trello cards." });
     }
   }
 
   if (req.method === "POST") {
     try {
-      const { key, token } = ensureConfiguredAuth();
+      const { key, token } = await getUserTrelloAuth(supabase, user.id);
       const baseUrl = getBaseUrl();
 
       const action = req.body?.action;
@@ -513,18 +503,14 @@ export async function handler(req, res) {
 
       return res.status(400).json({ error: "Unsupported Trello action." });
     } catch (error) {
-      if (error.code === MISSING_CREDENTIALS_ERROR) {
-        return res.status(503).json({ error: error.message });
-      }
+      console.error("Trello API error:", error);
 
       const status = Number.isInteger(error.status) ? error.status : null;
 
       if (status && status >= 400 && status < 600) {
-        console.error("Trello API error:", error);
         return res.status(status).json({ error: error.message || "Failed to update Trello card." });
       }
 
-      console.error("Trello API error:", error);
       return res.status(500).json({ error: error.message || "Failed to update Trello card." });
     }
   }
@@ -533,11 +519,8 @@ export async function handler(req, res) {
   return res.status(405).json({ error: "Method not allowed" });
 }
 
-export default handler;
-
 export {
   mapCardsToTasks,
-  filterCardsByBoard,
   fetchMemberCards,
   ensureBaseUrl,
   buildUrl,
