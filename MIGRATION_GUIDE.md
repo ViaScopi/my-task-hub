@@ -57,44 +57,58 @@ Created OAuth handlers for:
 2. Run the migration SQL from `supabase/migrations/001_initial_schema.sql`
 3. Get your Project URL and API keys from Settings > API
 
-### 2. Configure Environment Variables
-Copy `.env.example` to `.env.local` and fill in:
+### 2. Configure Environment Variables in Vercel
+Add environment variables in Vercel dashboard (Settings > Environment Variables):
 - Supabase credentials
 - OAuth app credentials (GitHub, Google, Trello)
-- Application URL
+- Application URL: `https://my-task-hub-rosy.vercel.app`
+
+For local development, copy `.env.example` to `.env.local`.
 
 ### 3. Set Up OAuth Apps
 
+**Production URLs** (for Vercel deployment at `https://my-task-hub-rosy.vercel.app`):
+
 #### GitHub
 1. Go to https://github.com/settings/developers
-2. Create new OAuth App
-3. Set callback URL: `http://localhost:3000/api/oauth/github/callback`
-4. Copy Client ID and Secret
+2. Create new OAuth App or update existing
+3. Set homepage URL: `https://my-task-hub-rosy.vercel.app`
+4. Set callback URL: `https://my-task-hub-rosy.vercel.app/api/oauth/github/callback`
+5. Copy Client ID and Secret
 
 #### Google
 1. Go to https://console.cloud.google.com/
 2. Create project and enable Google Tasks API + Calendar API
 3. Create OAuth 2.0 Client ID (Web application)
-4. Add authorized redirect URI: `http://localhost:3000/api/oauth/google/callback`
-5. Copy Client ID and Secret
+4. Add authorized redirect URI: `https://my-task-hub-rosy.vercel.app/api/oauth/google/callback`
+5. Add authorized JavaScript origin: `https://my-task-hub-rosy.vercel.app`
+6. Copy Client ID and Secret
 
 #### Trello
 1. Go to https://trello.com/power-ups/admin
 2. Create new Power-Up to get API key
 3. Copy API Key
 
-### 4. Run the Application
+**For Local Development** (optional):
+- Create separate OAuth apps with `http://localhost:3000` URLs
+- Use different environment variables for development
+
+### 4. Deploy to Vercel
+The app is already deployed at: https://my-task-hub-rosy.vercel.app
+
+For updates:
 ```bash
-npm install
-npm run dev
+git push origin <branch-name>
+# Vercel will auto-deploy
 ```
 
 ### 5. User Flow
-1. User signs up at `/login`
-2. User goes to `/settings` to connect integrations
-3. User clicks "Connect GitHub/Google/Trello"
-4. OAuth flow completes and stores tokens
-5. User can now access dashboard with their integrated tasks
+1. Visit https://my-task-hub-rosy.vercel.app/login
+2. Sign up with email and password
+3. Go to `/settings` to connect integrations
+4. Click "Connect GitHub/Google/Trello"
+5. Complete OAuth flow (tokens are stored in Supabase)
+6. Access `/dashboard` to see integrated tasks
 
 ## Migration for Existing Data
 

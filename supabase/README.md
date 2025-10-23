@@ -31,9 +31,13 @@ This will create all necessary tables, indexes, RLS policies, and triggers.
    - **anon public** key (starts with `eyJ...`)
    - **service_role** key (starts with `eyJ...`) - Keep this secret!
 
-## 4. Configure Environment Variables
+## 4. Configure Environment Variables in Vercel
 
-Create or update your `.env.local` file with:
+Add environment variables in your Vercel project dashboard:
+
+1. Go to https://vercel.com/your-username/my-task-hub-rosy
+2. Navigate to **Settings** > **Environment Variables**
+3. Add the following variables:
 
 ```env
 # Supabase Configuration
@@ -52,24 +56,28 @@ GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
 
 # Trello OAuth App
 TRELLO_API_KEY=your-trello-api-key
-TRELLO_OAUTH_SECRET=your-trello-oauth-secret
 
 # Application URL (for OAuth callbacks)
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=https://my-task-hub-rosy.vercel.app
 ```
+
+4. After adding variables, redeploy the app for changes to take effect
+
+**For Local Development**: Copy `.env.example` to `.env.local` and use `http://localhost:3000` as the app URL.
 
 ## 5. Set Up OAuth Apps
 
-You'll need to create OAuth applications for each integration:
+You'll need to create OAuth applications for each integration using your **production URL**:
 
 ### GitHub OAuth App
 1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
-2. Click "New OAuth App"
+2. Click "New OAuth App" or update existing
 3. Fill in:
    - **Application name**: My Task Hub
-   - **Homepage URL**: `http://localhost:3000` (or your production URL)
-   - **Authorization callback URL**: `http://localhost:3000/api/oauth/github/callback`
+   - **Homepage URL**: `https://my-task-hub-rosy.vercel.app`
+   - **Authorization callback URL**: `https://my-task-hub-rosy.vercel.app/api/oauth/github/callback`
 4. Copy the Client ID and generate a Client Secret
+5. Add these to Vercel environment variables
 
 ### Google OAuth App
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
@@ -78,15 +86,20 @@ You'll need to create OAuth applications for each integration:
 4. Go to "Credentials" > "Create Credentials" > "OAuth client ID"
 5. Configure consent screen if prompted
 6. Choose "Web application"
-7. Add authorized redirect URIs:
-   - `http://localhost:3000/api/oauth/google/callback`
-8. Copy the Client ID and Client Secret
+7. Add authorized JavaScript origins:
+   - `https://my-task-hub-rosy.vercel.app`
+8. Add authorized redirect URIs:
+   - `https://my-task-hub-rosy.vercel.app/api/oauth/google/callback`
+9. Copy the Client ID and Client Secret
+10. Add these to Vercel environment variables
 
 ### Trello OAuth App
 1. Go to [Trello Power-Ups](https://trello.com/power-ups/admin)
 2. Click "New" to create a new Power-Up
 3. Fill in the details and get your API Key
-4. Generate a Secret for OAuth
+4. Add the API Key to Vercel environment variables
+
+**Note**: For local development, create separate OAuth apps with `http://localhost:3000` URLs.
 
 ## 6. Configure Supabase Auth Providers (Optional)
 
@@ -99,10 +112,18 @@ If you want to offer social sign-in (in addition to email/password):
 
 ## 7. Test the Setup
 
+### Production (Vercel):
+1. Visit https://my-task-hub-rosy.vercel.app
+2. Try signing up with a new account
+3. Go to `/settings` and connect an integration
+4. Check Supabase dashboard > Authentication > Users to verify
+5. Check Supabase dashboard > Database > user_integrations to see stored tokens
+
+### Local Development (optional):
 1. Start your development server: `npm run dev`
 2. Visit `http://localhost:3000`
-3. Try signing up with a new account
-4. Check Supabase dashboard > Authentication > Users to verify
+3. Test sign-up and OAuth flows
+4. Use separate OAuth apps with localhost URLs
 
 ## Database Schema Overview
 
