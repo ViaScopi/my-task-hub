@@ -1,7 +1,7 @@
-const CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3";
-const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+import { createClient } from "../../lib/supabase/api";
+import { getValidAccessToken } from "../../lib/google-auth";
 
-const MISSING_CREDENTIALS_ERROR = "MISSING_GOOGLE_CALENDAR_CREDENTIALS";
+const CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3";
 
 function parseCalendarConfig(value) {
   const [idPart, ...labelParts] = value.split(":");
@@ -18,67 +18,36 @@ function parseCalendarConfig(value) {
   };
 }
 
-function getConfiguredCalendars() {
-  const raw = process.env.GOOGLE_CALENDAR_IDS;
+async function getConfiguredCalendars(supabase, userId) {
+  // Get user preferences for which calendars to show
+  const { data, error } = await supabase
+    .from("user_preferences")
+    .select("preferences")
+    .eq("user_id", userId)
+    .single();
 
-  if (!raw) {
+  if (error || !data || !data.preferences || !data.preferences.google_calendar_ids) {
+    // Return empty array if no calendars configured
+    // User can configure calendars in settings
     return [];
   }
 
-  return raw
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .map((value) => parseCalendarConfig(value))
-    .filter(Boolean);
-}
+  const calendarConfigs = data.preferences.google_calendar_ids;
 
-function getOAuthConfig() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-
-  if (!clientId || !clientSecret || !refreshToken) {
-    const error = new Error(
-      "Google Calendar integration is not configured. Please provide GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN environment variables."
-    );
-    error.code = MISSING_CREDENTIALS_ERROR;
-    throw error;
+  if (typeof calendarConfigs === 'string') {
+    return calendarConfigs
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .map((value) => parseCalendarConfig(value))
+      .filter(Boolean);
+  } else if (Array.isArray(calendarConfigs)) {
+    return calendarConfigs
+      .map((value) => parseCalendarConfig(value))
+      .filter(Boolean);
   }
 
-  return { clientId, clientSecret, refreshToken };
-}
-
-async function getAccessToken() {
-  const { clientId, clientSecret, refreshToken } = getOAuthConfig();
-
-  const body = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    refresh_token: refreshToken,
-    grant_type: "refresh_token",
-  });
-
-  const response = await fetch(TOKEN_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-
-  if (!response.ok) {
-    const data = await response.json().catch(() => null);
-    const message = data?.error_description || data?.error || "Failed to refresh Google access token.";
-    throw new Error(message);
-  }
-
-  const data = await response.json();
-  const accessToken = data?.access_token;
-
-  if (!accessToken) {
-    throw new Error("Google access token response did not include an access_token.");
-  }
-
-  return accessToken;
+  return [];
 }
 
 function mapEventToResponse(event, calendar) {
@@ -168,22 +137,35 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed." });
   }
 
-  const calendars = getConfiguredCalendars();
-  if (!calendars.length) {
-    return res.status(200).json([]);
+  const supabase = createClient(req, res);
+
+  // Get authenticated user
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const maxResults = Number.parseInt(req.query.maxResults, 10);
-  const safeMaxResults = Number.isNaN(maxResults) || maxResults <= 0 ? undefined : maxResults;
-  const rangeDays = Number.parseInt(req.query.rangeDays, 10);
-  const effectiveRangeDays = Number.isNaN(rangeDays) || rangeDays <= 0 ? 30 : rangeDays;
-
-  const now = new Date();
-  const timeMin = req.query.timeMin || now.toISOString();
-  const timeMax = req.query.timeMax || new Date(now.getTime() + effectiveRangeDays * 24 * 60 * 60 * 1000).toISOString();
-
   try {
-    const accessToken = await getAccessToken();
+    const calendars = await getConfiguredCalendars(supabase, user.id);
+
+    if (!calendars.length) {
+      return res.status(200).json([]);
+    }
+
+    const maxResults = Number.parseInt(req.query.maxResults, 10);
+    const safeMaxResults = Number.isNaN(maxResults) || maxResults <= 0 ? undefined : maxResults;
+    const rangeDays = Number.parseInt(req.query.rangeDays, 10);
+    const effectiveRangeDays = Number.isNaN(rangeDays) || rangeDays <= 0 ? 30 : rangeDays;
+
+    const now = new Date();
+    const timeMin = req.query.timeMin || now.toISOString();
+    const timeMax = req.query.timeMax || new Date(now.getTime() + effectiveRangeDays * 24 * 60 * 60 * 1000).toISOString();
+
+    const accessToken = await getValidAccessToken(supabase, user.id);
     const eventsByCalendar = await Promise.all(
       calendars.map((calendar) => fetchEventsForCalendar(accessToken, calendar, { timeMin, timeMax, maxResults: safeMaxResults }))
     );
@@ -201,10 +183,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json(events);
   } catch (error) {
-    if (error.code === MISSING_CREDENTIALS_ERROR) {
-      return res.status(501).json({ error: error.message, code: error.code });
-    }
-
     console.error("Error loading Google Calendar events", error);
     return res.status(500).json({ error: error.message || "Failed to load Google Calendar events." });
   }
