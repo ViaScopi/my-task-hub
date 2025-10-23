@@ -1,11 +1,16 @@
 import { createClient } from "../../../../lib/supabase/api";
 
 export default async function handler(req, res) {
-  const { token, state } = req.query;
+  // Only accept POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-  console.log('[Trello Callback] Starting callback handler');
-  console.log('[Trello Callback] Token present:', !!token);
-  console.log('[Trello Callback] State:', state);
+  const { token, state } = req.body;
+
+  console.log('[Trello Complete] Starting completion handler');
+  console.log('[Trello Complete] Token present:', !!token);
+  console.log('[Trello Complete] State:', state);
 
   const supabase = createClient(req, res);
 
@@ -15,23 +20,23 @@ export default async function handler(req, res) {
     error: authError,
   } = await supabase.auth.getUser();
 
-  console.log('[Trello Callback] Auth check - User ID:', user?.id);
-  console.log('[Trello Callback] Auth error:', authError);
+  console.log('[Trello Complete] Auth check - User ID:', user?.id);
+  console.log('[Trello Complete] Auth error:', authError);
 
   if (authError || !user) {
-    console.error('[Trello Callback] No authenticated user, redirecting to login');
-    return res.redirect("/login");
+    console.error('[Trello Complete] No authenticated user');
+    return res.status(401).json({ error: 'Not authenticated' });
   }
 
   // Verify state matches user ID
   if (state !== user.id) {
-    console.error('[Trello Callback] State mismatch - expected:', user.id, 'got:', state);
-    return res.redirect("/settings?error=invalid_state");
+    console.error('[Trello Complete] State mismatch - expected:', user.id, 'got:', state);
+    return res.status(403).json({ error: 'Invalid state parameter' });
   }
 
   if (!token) {
-    console.error('[Trello Callback] No token provided');
-    return res.redirect("/settings?error=no_token");
+    console.error('[Trello Complete] No token provided');
+    return res.status(400).json({ error: 'No token provided' });
   }
 
   try {
@@ -42,19 +47,19 @@ export default async function handler(req, res) {
     }
 
     // Get Trello user info
-    console.log('[Trello Callback] Fetching Trello user info');
+    console.log('[Trello Complete] Fetching Trello user info');
     const userResponse = await fetch(
       `https://api.trello.com/1/members/me?key=${apiKey}&token=${token}`
     );
 
     if (!userResponse.ok) {
       const errorText = await userResponse.text();
-      console.error('[Trello Callback] Trello API error:', userResponse.status, errorText);
+      console.error('[Trello Complete] Trello API error:', userResponse.status, errorText);
       throw new Error("Failed to fetch Trello user info");
     }
 
     const trelloUser = await userResponse.json();
-    console.log('[Trello Callback] Trello user:', {
+    console.log('[Trello Complete] Trello user:', {
       id: trelloUser.id,
       username: trelloUser.username,
       email: trelloUser.email
@@ -75,7 +80,7 @@ export default async function handler(req, res) {
       updated_at: new Date().toISOString(),
     };
 
-    console.log('[Trello Callback] Attempting to insert/update integration for user:', user.id);
+    console.log('[Trello Complete] Attempting to insert/update integration for user:', user.id);
 
     // Store integration in database
     const { data: insertedData, error: dbError } = await supabase
@@ -85,7 +90,7 @@ export default async function handler(req, res) {
       })
       .select();
 
-    console.log('[Trello Callback] Database operation result:', {
+    console.log('[Trello Complete] Database operation result:', {
       error: dbError,
       data: insertedData,
       hasData: !!insertedData,
@@ -93,15 +98,19 @@ export default async function handler(req, res) {
     });
 
     if (dbError) {
-      console.error('[Trello Callback] Database error details:', JSON.stringify(dbError, null, 2));
+      console.error('[Trello Complete] Database error details:', JSON.stringify(dbError, null, 2));
       throw dbError;
     }
 
-    console.log('[Trello Callback] Successfully stored integration');
-    return res.redirect("/settings?success=trello_connected");
+    console.log('[Trello Complete] Successfully stored integration');
+    return res.status(200).json({
+      success: true,
+      message: 'Trello integration connected successfully',
+      data: insertedData
+    });
   } catch (error) {
-    console.error('[Trello Callback] Error:', error);
-    console.error('[Trello Callback] Error stack:', error.stack);
-    return res.redirect(`/settings?error=${encodeURIComponent(error.message)}`);
+    console.error('[Trello Complete] Error:', error);
+    console.error('[Trello Complete] Error stack:', error.stack);
+    return res.status(500).json({ error: error.message });
   }
 }
