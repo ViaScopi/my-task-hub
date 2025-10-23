@@ -1702,3 +1702,92 @@ main {
     gap: 0.25rem;
   }
 }
+
+/* Google OAuth Button */
+.button--google {
+  background: #ffffff;
+  color: #3c4043;
+  border: 1px solid #dadce0;
+  box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+  font-weight: 500;
+  gap: 0.75rem;
+}
+
+.button--google:hover:not(:disabled) {
+  background: #f8f9fa;
+  box-shadow: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+}
+
+.button__icon {
+  flex-shrink: 0;
+}
+
+/* Auth Divider */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0.5rem 0;
+  color: var(--slate-500);
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.auth-divider__text {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--slate-500);
+}
+
+/* Dashboard enhancements */
+.dashboard__eyebrow {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-strong);
+  opacity: 0.85;
+  margin-bottom: 0.5rem;
+}
+
+.dashboard__intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.dashboard__actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.dashboard__loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+}
+
+@media (max-width: 720px) {
+  .dashboard__intro {
+    flex-direction: column;
+  }
+  
+  .dashboard__actions {
+    width: 100%;
+  }
+  
+  .dashboard__actions .button {
+    flex: 1;
+  }
+}
