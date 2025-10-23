@@ -1,8 +1,9 @@
-import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { useAuth } from "./_app";
 
 export default function Home() {
-  const { isSignedIn } = useUser();
+  const { user } = useAuth();
+  const isSignedIn = Boolean(user);
 
   return (
     <main className="home">
