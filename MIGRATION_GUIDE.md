@@ -36,8 +36,9 @@ Created OAuth handlers for:
 ### 4. Updated API Endpoints
 - `/api/github.js` - Now uses per-user GitHub tokens from database
 - `/api/google-tasks.js` - Now uses per-user Google tokens with auto-refresh
-- `/api/trello.js` - Needs update (TODO)
-- `/api/google-calendar.js` - Needs update (TODO)
+- `/api/trello.js` - Now uses per-user Trello tokens from database
+- `/api/google-calendar.js` - Now uses per-user Google tokens with auto-refresh
+- `/api/completed-tasks.js` - Now uses Supabase database instead of JSON file
 
 ### 5. New Pages
 - `/pages/settings.js` - Integration management page
@@ -134,11 +135,12 @@ If you had completed tasks in JSON files:
 ## Remaining Work
 
 ### High Priority
-1. Complete Trello API endpoint migration
-2. Complete Google Calendar API endpoint migration
-3. Migrate completed tasks storage from JSON to Supabase
-4. Add CSS styling for new auth pages and settings page
-5. Test complete OAuth flows end-to-end
+✅ All high-priority tasks completed! The migration to Supabase is now complete:
+1. ✅ Complete Trello API endpoint migration
+2. ✅ Complete Google Calendar API endpoint migration  
+3. ✅ Migrate completed tasks storage from JSON to Supabase
+4. ✅ Add CSS styling for new auth pages and settings page
+5. ✅ Fix Trello OAuth to handle token from URL fragment
 
 ### Medium Priority
 1. Add password reset functionality
