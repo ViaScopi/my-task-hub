@@ -1632,7 +1632,13 @@ main {
 }
 
 .integration-card__icon {
-  font-size: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  color: var(--slate-700);
 }
 
 .integration-card__content {
@@ -1790,4 +1796,306 @@ main {
   .dashboard__actions .button {
     flex: 1;
   }
+}
+
+/* Enhanced Responsive Design Improvements */
+
+/* Prevent horizontal overflow */
+* {
+  max-width: 100%;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Ensure images and media don't overflow */
+img, video, iframe, svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Better container constraints */
+.app, .app-shell {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Integration card icon sizing */
+.integration-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
+
+.integration-card__icon svg {
+  flex-shrink: 0;
+}
+
+/* Improved header responsiveness */
+@media (max-width: 640px) {
+  .site-header__inner {
+    padding: 0.75rem 1rem;
+    gap: 1rem;
+  }
+
+  .site-header__brand {
+    font-size: 1rem;
+  }
+
+  .site-nav {
+    gap: 0.5rem;
+  }
+
+  .site-nav__link {
+    font-size: 0.85rem;
+    padding: 0.35rem 0.7rem;
+  }
+
+  .site-header__user {
+    font-size: 0.85rem;
+  }
+
+  .site-header__button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+  }
+}
+
+/* Improved auth page responsiveness */
+@media (max-width: 480px) {
+  .auth {
+    padding: 2rem 1rem;
+  }
+
+  .auth-card {
+    padding: 1.5rem;
+  }
+
+  .auth-card__title {
+    font-size: 1.5rem;
+  }
+
+  .button--google {
+    font-size: 0.875rem;
+    padding: 0.65rem 1.2rem;
+  }
+}
+
+/* Improved settings page responsiveness */
+@media (max-width: 600px) {
+  .page-container {
+    padding: 2rem 1rem;
+  }
+
+  .page-container h1 {
+    font-size: 1.75rem;
+  }
+
+  .settings-section h2 {
+    font-size: 1.35rem;
+  }
+
+  .integrations-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .integration-card {
+    padding: 1.25rem;
+  }
+
+  .integration-card__icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .integration-card__name {
+    font-size: 1.1rem;
+  }
+
+  .integration-card__description {
+    font-size: 0.875rem;
+  }
+}
+
+/* Dashboard improvements */
+@media (max-width: 600px) {
+  .dashboard {
+    padding: 2rem 1rem;
+    gap: 1.5rem;
+  }
+
+  .dashboard__intro h1 {
+    font-size: 1.75rem;
+  }
+
+  .dashboard__eyebrow {
+    font-size: 0.7rem;
+  }
+
+  .dashboard__actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .dashboard__actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Task card improvements */
+@media (max-width: 600px) {
+  .task-card {
+    padding: 1.25rem;
+  }
+
+  .task-card__title {
+    font-size: 1.5rem;
+  }
+
+  .task-item {
+    padding: 1rem;
+  }
+
+  .task-item__title {
+    font-size: 0.95rem;
+  }
+
+  .task-item__description {
+    font-size: 0.875rem;
+  }
+}
+
+/* Improve home page on small screens */
+@media (max-width: 600px) {
+  .home {
+    padding: 2rem 1rem;
+  }
+
+  .home__title {
+    font-size: 2rem;
+  }
+
+  .home__description {
+    font-size: 0.95rem;
+  }
+
+  .home__actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .home__actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Kanban board mobile improvements */
+@media (max-width: 600px) {
+  .kanban-page {
+    padding: 1.5rem 1rem;
+  }
+
+  .kanban-page__intro h1 {
+    font-size: 1.75rem;
+  }
+
+  .kanban-board__controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .kanban-board__filters {
+    justify-content: flex-start;
+  }
+
+  .kanban-board__columns {
+    gap: 1rem;
+  }
+
+  .kanban-board__column {
+    padding: 1rem;
+  }
+
+  .kanban-board__column-header h2 {
+    font-size: 1rem;
+  }
+
+  .kanban-board__card {
+    padding: 0.875rem;
+  }
+}
+
+/* Event card improvements */
+@media (max-width: 600px) {
+  .event-card {
+    padding: 1.25rem;
+  }
+
+  .event-card__title {
+    font-size: 1.35rem;
+  }
+
+  .event-card__header {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .event-card__next {
+    width: 100%;
+  }
+
+  .event-item {
+    padding: 1rem;
+  }
+
+  .event-item__title {
+    font-size: 1.05rem;
+  }
+}
+
+/* Improve text wrapping and overflow */
+.integration-card__description,
+.task-item__description,
+.event-item__description,
+.settings-description {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.integration-card__name,
+.task-item__title,
+.event-item__title {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Ensure buttons don't break layout */
+.button {
+  white-space: nowrap;
+  min-width: fit-content;
+}
+
+@media (max-width: 600px) {
+  .button {
+    white-space: normal;
+  }
+}
+
+/* Prevent long URLs and emails from breaking layout */
+a, .settings-info__value {
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
