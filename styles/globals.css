@@ -277,6 +277,57 @@ main {
   color: var(--slate-600);
 }
 
+.task-item__badge--priority-high {
+  background: rgba(220, 38, 38, 0.12);
+  color: #991b1b;
+  font-weight: 700;
+}
+
+.task-item__badge--priority-medium {
+  background: rgba(251, 191, 36, 0.12);
+  color: #92400e;
+  font-weight: 700;
+}
+
+.task-item__badge--priority-low {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1e40af;
+  font-weight: 700;
+}
+
+.task-item__priority {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.85rem;
+}
+
+.task-item__priority label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--slate-600);
+}
+
+.task-item__priority-select {
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  padding: 0.55rem 0.8rem;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--slate-700);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.task-item__priority-select:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
+.task-item__priority-select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .task-item__pipeline {
   display: grid;
   gap: 0.4rem;
@@ -1599,6 +1650,55 @@ main {
   font-size: 1.05rem;
 }
 
+.calendar-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.calendar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.calendar-item:hover {
+  background: rgba(99, 102, 241, 0.05);
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+.calendar-item__checkbox {
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+}
+
+.calendar-item__name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: var(--slate-700);
+}
+
+.calendar-item__badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.5rem;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--accent-strong);
+  border-radius: 999px;
+}
+
 .alert {
   padding: 0.85rem 1.1rem;
   border-radius: 16px;
@@ -2074,9 +2174,7 @@ img, video, iframe, svg {
 .task-item__description,
 .event-item__description,
 .settings-description {
-  word-wrap: break-word;
   overflow-wrap: break-word;
-  word-break: break-word;
   hyphens: auto;
 }
 
@@ -2084,15 +2182,13 @@ img, video, iframe, svg {
 .task-item__title,
 .event-item__title,
 .task-item__repo {
-  word-wrap: break-word;
   overflow-wrap: break-word;
-  word-break: break-word;
+  hyphens: auto;
 }
 
-/* Ensure links in tasks can break */
+/* Ensure links in tasks can break anywhere to prevent overflow */
 .task-item a,
 .event-item a {
-  word-wrap: break-word;
   overflow-wrap: break-word;
   word-break: break-all;
 }
