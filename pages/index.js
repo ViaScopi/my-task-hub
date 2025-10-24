@@ -7,7 +7,13 @@ export default function Home() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const [checkingOAuth, setCheckingOAuth] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const isSignedIn = Boolean(user);
+
+  // Track when component is mounted (client-side only)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Check if this is an OAuth callback and handle it
   useEffect(() => {
@@ -43,18 +49,15 @@ export default function Home() {
     }
   }, [loading, user, router, checkingOAuth]);
 
-  // Show loading state during OAuth processing
-  const isOAuthCallback = typeof window !== 'undefined' &&
-    (window.location.search.includes('code=') || window.location.hash.includes('access_token='));
-
-  if (checkingOAuth || (loading && isOAuthCallback)) {
+  // Show loading state during OAuth processing or before mount
+  if (!mounted || checkingOAuth || loading) {
     return (
       <main className="home">
         <section className="home__hero" style={{ textAlign: 'center' }}>
           <div className="task-state">
             <div className="task-state__spinner"></div>
-            <h2 className="task-state__title">Completing sign in...</h2>
-            <p className="task-state__message">Please wait while we finish authentication.</p>
+            <h2 className="task-state__title">Loading...</h2>
+            <p className="task-state__message">Please wait a moment.</p>
           </div>
         </section>
       </main>
