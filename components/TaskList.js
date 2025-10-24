@@ -50,6 +50,7 @@ export default function TaskList() {
   const [pipelineStatus, setPipelineStatus] = useState({});
   const [trelloCardStatus, setTrelloCardStatus] = useState({});
   const [trelloComments, setTrelloComments] = useState({});
+  const [priorityStatus, setPriorityStatus] = useState({});
 
   useEffect(() => {
     setTrelloCardStatus((prev) => {
@@ -364,6 +365,55 @@ export default function TaskList() {
     }
   };
 
+  const updateTaskPriority = async (task, newPriority) => {
+    if (!task || !task.originalId) {
+      return;
+    }
+
+    setPriorityStatus((prev) => ({
+      ...prev,
+      [task.id]: { loading: true, error: "" },
+    }));
+
+    try {
+      const response = await fetch("/api/task-priority", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: task.source,
+          originalId: task.originalId,
+          priority: newPriority || null, // null will remove the priority
+        }),
+      });
+
+      const responseData = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = responseData?.error || "Failed to update task priority.";
+        throw new Error(message);
+      }
+
+      // Update local task list
+      setTasks((prevTasks) =>
+        prevTasks.map((item) =>
+          item.id === task.id ? { ...item, priority: newPriority || null } : item
+        )
+      );
+
+      setPriorityStatus((prev) => {
+        const next = { ...prev };
+        delete next[task.id];
+        return next;
+      });
+    } catch (err) {
+      console.error("Failed to update task priority:", err);
+      setPriorityStatus((prev) => ({
+        ...prev,
+        [task.id]: { loading: false, error: err.message || "Unable to update priority." },
+      }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="task-card">
@@ -411,6 +461,7 @@ export default function TaskList() {
           const description = task.description?.trim();
           const badgeClass = SOURCE_BADGE_CLASS[task.source] || "default";
           const pipelineState = pipelineStatus[task.id] || {};
+          const priorityState = priorityStatus[task.id] || {};
           const trelloState = trelloCardStatus[task.id] || {};
           const trelloComment = trelloComments[task.id] ?? "";
           const dueLabel = formatDueDate(task.dueDate || task.due);
@@ -432,6 +483,11 @@ export default function TaskList() {
                     {task.source && (
                       <span className={`task-item__badge task-item__badge--${badgeClass}`}>
                         {task.source}
+                      </span>
+                    )}
+                    {task.priority && (
+                      <span className={`task-item__badge task-item__badge--priority-${task.priority}`}>
+                        {task.priority}
                       </span>
                     )}
                   </div>
@@ -461,6 +517,23 @@ export default function TaskList() {
                     Mark done
                   </button>
                 )}
+              </div>
+
+              <div className="task-item__priority">
+                <label htmlFor={`priority-${task.id}`}>Priority</label>
+                <select
+                  id={`priority-${task.id}`}
+                  className="task-item__priority-select"
+                  value={task.priority || ""}
+                  onChange={(event) => updateTaskPriority(task, event.target.value)}
+                  disabled={Boolean(priorityState.loading)}
+                >
+                  <option value="">None</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+                {priorityState.error && <p className="task-item__error">{priorityState.error}</p>}
               </div>
 
               {task.source === "Google Tasks" && task.pipelineOptions?.length > 0 && (

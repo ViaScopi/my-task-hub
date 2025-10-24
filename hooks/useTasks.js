@@ -196,9 +196,18 @@ export function useTasks() {
 
             return Array.isArray(data) ? data : [];
           }),
+          fetch("/api/task-priority", { signal }).then(async (response) => {
+            const data = await response.json().catch(() => null);
+
+            if (!response.ok) {
+              return {}; // Priorities are optional, don't fail if unavailable
+            }
+
+            return data || {};
+          }),
         ];
 
-        const [githubResult, googleResult, trelloResult, completedResult] =
+        const [githubResult, googleResult, trelloResult, completedResult, prioritiesResult] =
           await Promise.allSettled(requests);
 
         if (signal?.aborted) {
@@ -243,9 +252,22 @@ export function useTasks() {
           console.error("Failed to load completed task history:", completedResult.reason);
         }
 
+        // Get priorities map
+        let priorities = {};
+        if (prioritiesResult.status === "fulfilled") {
+          priorities = prioritiesResult.value || {};
+        }
+
         const mergedTasks = mergeTasksWithCompletions(integrationTasks, completedSnapshots);
 
-        setTasks(mergedTasks);
+        // Add priorities to tasks
+        const tasksWithPriorities = mergedTasks.map((task) => {
+          const priorityKey = `${task.source}:${task.originalId}`;
+          const priority = priorities[priorityKey] || null;
+          return { ...task, priority };
+        });
+
+        setTasks(tasksWithPriorities);
 
         if (errors.length === 1) {
           setFetchError(`Heads up: ${errors[0]} couldn't be loaded right now.`);
