@@ -186,6 +186,9 @@ main {
   display: grid;
   gap: 0.85rem;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .task-item:hover {
@@ -2073,14 +2076,25 @@ img, video, iframe, svg {
 .settings-description {
   word-wrap: break-word;
   overflow-wrap: break-word;
+  word-break: break-word;
   hyphens: auto;
 }
 
 .integration-card__name,
 .task-item__title,
-.event-item__title {
+.event-item__title,
+.task-item__repo {
   word-wrap: break-word;
   overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Ensure links in tasks can break */
+.task-item a,
+.event-item a {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-all;
 }
 
 /* Ensure buttons don't break layout */

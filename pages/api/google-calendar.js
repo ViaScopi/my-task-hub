@@ -26,28 +26,26 @@ async function getConfiguredCalendars(supabase, userId) {
     .eq("user_id", userId)
     .single();
 
-  if (error || !data || !data.preferences || !data.preferences.google_calendar_ids) {
-    // Return empty array if no calendars configured
-    // User can configure calendars in settings
-    return [];
+  // If specific calendars are configured, use those
+  if (!error && data && data.preferences && data.preferences.google_calendar_ids) {
+    const calendarConfigs = data.preferences.google_calendar_ids;
+
+    if (typeof calendarConfigs === 'string') {
+      return calendarConfigs
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .map((value) => parseCalendarConfig(value))
+        .filter(Boolean);
+    } else if (Array.isArray(calendarConfigs)) {
+      return calendarConfigs
+        .map((value) => parseCalendarConfig(value))
+        .filter(Boolean);
+    }
   }
 
-  const calendarConfigs = data.preferences.google_calendar_ids;
-
-  if (typeof calendarConfigs === 'string') {
-    return calendarConfigs
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean)
-      .map((value) => parseCalendarConfig(value))
-      .filter(Boolean);
-  } else if (Array.isArray(calendarConfigs)) {
-    return calendarConfigs
-      .map((value) => parseCalendarConfig(value))
-      .filter(Boolean);
-  }
-
-  return [];
+  // Default: use primary calendar if no specific calendars configured
+  return [{ id: 'primary', label: 'Primary Calendar' }];
 }
 
 function mapEventToResponse(event, calendar) {
