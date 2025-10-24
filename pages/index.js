@@ -11,6 +11,9 @@ export default function Home() {
 
   // Check if this is an OAuth callback and handle it
   useEffect(() => {
+    // Only run in browser
+    if (typeof window === 'undefined') return;
+
     // Check if we have OAuth parameters in the URL
     const searchParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -41,7 +44,10 @@ export default function Home() {
   }, [loading, user, router, checkingOAuth]);
 
   // Show loading state during OAuth processing
-  if (checkingOAuth || (loading && (window.location.search.includes('code=') || window.location.hash.includes('access_token=')))) {
+  const isOAuthCallback = typeof window !== 'undefined' &&
+    (window.location.search.includes('code=') || window.location.hash.includes('access_token='));
+
+  if (checkingOAuth || (loading && isOAuthCallback)) {
     return (
       <main className="home">
         <section className="home__hero" style={{ textAlign: 'center' }}>
