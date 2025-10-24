@@ -205,6 +205,8 @@ main {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 @media (min-width: 640px) {
@@ -218,6 +220,8 @@ main {
 .task-item__heading {
   display: grid;
   gap: 0.2rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .task-item__title-row {
@@ -225,6 +229,7 @@ main {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.65rem;
+  min-width: 0;
 }
 
 .task-item__title {
@@ -233,6 +238,8 @@ main {
   font-size: 1.05rem;
   text-decoration: none;
   transition: color 0.2s ease;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .task-item__title:hover {
@@ -366,6 +373,8 @@ main {
   font-size: 0.95rem;
   color: var(--slate-600);
   white-space: pre-line;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .task-item__description--muted {
@@ -2175,7 +2184,9 @@ img, video, iframe, svg {
 .event-item__description,
 .settings-description {
   overflow-wrap: break-word;
-  hyphens: auto;
+  word-break: normal;
+  hyphens: manual;
+  max-width: 100%;
 }
 
 .integration-card__name,
@@ -2183,14 +2194,17 @@ img, video, iframe, svg {
 .event-item__title,
 .task-item__repo {
   overflow-wrap: break-word;
-  hyphens: auto;
+  word-break: normal;
+  hyphens: manual;
+  max-width: 100%;
 }
 
 /* Ensure links in tasks can break anywhere to prevent overflow */
 .task-item a,
 .event-item a {
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
   word-break: break-all;
+  max-width: 100%;
 }
 
 /* Ensure buttons don't break layout */
