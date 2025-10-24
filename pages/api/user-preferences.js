@@ -1,4 +1,4 @@
-import { createClient } from "../../lib/supabase/server";
+import { createClient } from "../../lib/supabase/api";
 
 export default async function handler(req, res) {
   const supabase = createClient(req, res);
