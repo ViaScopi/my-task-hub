@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useAuth } from "../pages/_app";
 
 const NAV_LINKS = [
-  { href: "/", label: "Home", requiresAuth: false },
+  { href: "/", label: "Home", requiresAuth: false, hideWhenAuth: true },
   { href: "/dashboard", label: "Dashboard", requiresAuth: true },
   { href: "/calendar", label: "Calendar", requiresAuth: true },
   { href: "/kanban", label: "Kanban Board", requiresAuth: true },
@@ -17,7 +17,13 @@ export default function Layout({ children }) {
   const isSignedIn = Boolean(user);
 
   const navigationLinks = useMemo(() => {
-    return NAV_LINKS.filter((link) => (link.requiresAuth ? isSignedIn : true));
+    return NAV_LINKS.filter((link) => {
+      // Hide links that require auth when not signed in
+      if (link.requiresAuth && !isSignedIn) return false;
+      // Hide links that should be hidden when authenticated
+      if (link.hideWhenAuth && isSignedIn) return false;
+      return true;
+    });
   }, [isSignedIn]);
 
   const displayName = useMemo(() => {
@@ -44,7 +50,7 @@ export default function Layout({ children }) {
     <div className="app-shell">
       <header className="site-header">
         <div className="site-header__inner">
-          <Link href="/" className="site-header__brand">
+          <Link href={isSignedIn ? "/dashboard" : "/"} className="site-header__brand">
             My Task Hub
           </Link>
 

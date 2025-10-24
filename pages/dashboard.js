@@ -33,7 +33,13 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <main className="dashboard">
-        <p>Loading...</p>
+        <div className="dashboard__loading">
+          <div className="task-state">
+            <div className="task-state__spinner"></div>
+            <h2 className="task-state__title">Loading your dashboard...</h2>
+            <p className="task-state__message">Please wait while we gather your tasks.</p>
+          </div>
+        </div>
       </main>
     );
   }
@@ -55,11 +61,22 @@ export default function DashboardPage() {
   return (
     <main className="dashboard">
       <section className="dashboard__intro">
-        <h1>Welcome back, {greetingName}!</h1>
-        <p>
-          Here&apos;s a quick rundown of everything assigned to you across GitHub, Google Tasks, and
-          Trello.
-        </p>
+        <div>
+          <span className="dashboard__eyebrow">Your Dashboard</span>
+          <h1>Welcome back, {greetingName}!</h1>
+          <p>
+            Here&apos;s a quick rundown of everything assigned to you across GitHub, Google Tasks, and
+            Trello.
+          </p>
+        </div>
+        <div className="dashboard__actions">
+          <Link href="/settings" className="button button--ghost button--small">
+            Manage Integrations
+          </Link>
+          <Link href="/kanban" className="button button--primary button--small">
+            Kanban Board
+          </Link>
+        </div>
       </section>
       <div className="dashboard__columns">
         <section className="dashboard__tasks" aria-label="Task rundown">

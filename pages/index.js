@@ -1,9 +1,19 @@
 import Link from "next/link";
+import { useRouter } from "next/router";
+import { useEffect } from "react";
 import { useAuth } from "./_app";
 
 export default function Home() {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const isSignedIn = Boolean(user);
+
+  // Redirect logged-in users to dashboard
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace("/dashboard");
+    }
+  }, [loading, user, router]);
 
   return (
     <main className="home">
