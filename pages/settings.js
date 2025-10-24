@@ -1,25 +1,26 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useAuth, useSupabase } from "./_app";
+import { GitHubLogo, GoogleLogo, TrelloLogo } from "../components/IntegrationLogos";
 
 const INTEGRATIONS = [
   {
     id: "github",
     name: "GitHub",
     description: "Connect your GitHub account to see assigned issues",
-    icon: "🐙",
+    Logo: GitHubLogo,
   },
   {
     id: "google",
     name: "Google",
     description: "Connect Google Tasks and Calendar",
-    icon: "📧",
+    Logo: GoogleLogo,
   },
   {
     id: "trello",
     name: "Trello",
     description: "Connect your Trello boards",
-    icon: "📋",
+    Logo: TrelloLogo,
   },
 ];
 
@@ -128,10 +129,13 @@ export default function SettingsPage() {
         <div className="integrations-grid">
           {INTEGRATIONS.map((integration) => {
             const connected = Boolean(integrations[integration.id]);
+            const { Logo } = integration;
 
             return (
               <div key={integration.id} className="integration-card">
-                <div className="integration-card__icon">{integration.icon}</div>
+                <div className="integration-card__icon">
+                  <Logo size={48} />
+                </div>
                 <div className="integration-card__content">
                   <h3 className="integration-card__name">{integration.name}</h3>
                   <p className="integration-card__description">
