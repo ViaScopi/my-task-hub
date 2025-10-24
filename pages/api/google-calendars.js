@@ -16,6 +16,8 @@ export default async function handler(req, res) {
 
   if (req.method === "GET") {
     try {
+      console.log("Fetching Google calendars for user:", user.id);
+
       // Get Google integration
       const { data: integration, error: integrationError } = await supabase
         .from("user_integrations")
@@ -24,8 +26,17 @@ export default async function handler(req, res) {
         .eq("provider", "google")
         .single();
 
+      console.log("Google integration query result:", {
+        found: !!integration,
+        error: integrationError?.message,
+        hasAccessToken: !!integration?.access_token
+      });
+
       if (integrationError || !integration) {
-        return res.status(404).json({ error: "Google integration not found" });
+        return res.status(404).json({
+          error: "Google integration not found",
+          details: integrationError?.message
+        });
       }
 
       // Set up OAuth2 client
@@ -43,6 +54,8 @@ export default async function handler(req, res) {
       const calendar = google.calendar({ version: "v3", auth: oauth2Client });
       const response = await calendar.calendarList.list();
 
+      console.log(`Found ${response.data.items?.length || 0} calendars`);
+
       const calendars = (response.data.items || []).map((cal) => ({
         id: cal.id,
         summary: cal.summary,
@@ -54,7 +67,10 @@ export default async function handler(req, res) {
       return res.status(200).json(calendars);
     } catch (error) {
       console.error("Error fetching Google calendars:", error);
-      return res.status(500).json({ error: "Failed to fetch calendars" });
+      return res.status(500).json({
+        error: "Failed to fetch calendars",
+        details: error.message
+      });
     }
   }
 

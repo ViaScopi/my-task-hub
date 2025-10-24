@@ -367,8 +367,20 @@ export default function TaskList() {
 
   const updateTaskPriority = async (task, newPriority) => {
     if (!task || !task.originalId) {
+      console.error("Missing task or originalId:", { task, hasOriginalId: !!task?.originalId });
+      setPriorityStatus((prev) => ({
+        ...prev,
+        [task.id]: { loading: false, error: "Task missing required originalId" },
+      }));
       return;
     }
+
+    console.log("Updating task priority:", {
+      id: task.id,
+      source: task.source,
+      originalId: task.originalId,
+      newPriority
+    });
 
     setPriorityStatus((prev) => ({
       ...prev,
@@ -389,8 +401,10 @@ export default function TaskList() {
       const responseData = await response.json().catch(() => null);
 
       if (!response.ok) {
+        console.error("Priority update failed:", responseData);
         const message = responseData?.error || "Failed to update task priority.";
-        throw new Error(message);
+        const details = responseData?.details ? ` (${responseData.details})` : "";
+        throw new Error(message + details);
       }
 
       // Update local task list

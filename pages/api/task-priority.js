@@ -42,9 +42,13 @@ export default async function handler(req, res) {
 
   const { source, originalId, priority } = req.body;
 
-  // Validate input
+  // Validate input with detailed logging
+  console.log("Priority update request:", { source, originalId, priority, userId: user.id });
+
   if (!source || !originalId) {
-    return res.status(400).json({ error: "Missing required fields: source, originalId" });
+    const errorMsg = `Missing required fields - source: ${source}, originalId: ${originalId}`;
+    console.error(errorMsg);
+    return res.status(400).json({ error: errorMsg });
   }
 
   if (!priority) {
@@ -87,7 +91,11 @@ export default async function handler(req, res) {
 
   if (error) {
     console.error("Error updating task priority:", error);
-    return res.status(500).json({ error: "Failed to update priority" });
+    return res.status(500).json({
+      error: "Failed to update priority",
+      details: error.message,
+      code: error.code
+    });
   }
 
   return res.status(200).json({ success: true, priority: data.priority });

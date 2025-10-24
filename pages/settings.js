@@ -107,15 +107,26 @@ export default function SettingsPage() {
 
     const loadCalendars = async () => {
       setLoadingCalendars(true);
+      setError(""); // Clear any previous errors
       try {
         const [calendarsRes, prefsRes] = await Promise.all([
           fetch("/api/google-calendars"),
           fetch("/api/user-preferences"),
         ]);
 
+        console.log("Calendar fetch response:", {
+          status: calendarsRes.status,
+          ok: calendarsRes.ok
+        });
+
         if (calendarsRes.ok) {
           const calendarsData = await calendarsRes.json();
+          console.log("Calendars data:", calendarsData);
           setCalendars(calendarsData || []);
+        } else {
+          const errorData = await calendarsRes.json().catch(() => ({}));
+          console.error("Failed to fetch calendars:", errorData);
+          setError(`Failed to load calendars: ${errorData.details || errorData.error || "Unknown error"}`);
         }
 
         if (prefsRes.ok) {
@@ -125,6 +136,7 @@ export default function SettingsPage() {
         }
       } catch (err) {
         console.error("Error loading calendars:", err);
+        setError(`Error loading calendars: ${err.message}`);
       } finally {
         setLoadingCalendars(false);
       }
