@@ -134,6 +134,13 @@ export default function EventList() {
     return formatRelativeTime(new Date(nextEvent.start));
   }, [nextEvent]);
 
+  // Check if error is related to missing configuration
+  const isConfigurationError = error && (
+    error.includes('Unauthorized') ||
+    error.includes('not configured') ||
+    error.includes('401')
+  );
+
   return (
     <section className="event-card" aria-label="Upcoming events">
       <div className="event-card__header">
@@ -150,7 +157,23 @@ export default function EventList() {
       </div>
 
       {loading && <p className="event-card__status">Loading calendar events…</p>}
-      {error && !loading && <p className="event-card__status event-card__status--error">{error}</p>}
+
+      {isConfigurationError && !loading && (
+        <div className="event-card__setup">
+          <p className="event-card__status">Google Calendar not connected</p>
+          <p className="event-card__description" style={{ marginTop: '0.5rem', marginBottom: '1rem', color: 'var(--slate-600)' }}>
+            Connect your Google account in settings to see your upcoming calendar events here.
+          </p>
+          <Link href="/settings" className="button button--primary button--small">
+            Connect Google Calendar
+          </Link>
+        </div>
+      )}
+
+      {error && !isConfigurationError && !loading && (
+        <p className="event-card__status event-card__status--error">{error}</p>
+      )}
+
       {!loading && !error && !eventItems.length && (
         <p className="event-card__status">No upcoming events found.</p>
       )}
@@ -163,11 +186,13 @@ export default function EventList() {
         </ol>
       )}
 
-      <div className="event-card__footer">
-        <Link href="/calendar" className="event-card__footer-link">
-          View full calendar
-        </Link>
-      </div>
+      {!isConfigurationError && (
+        <div className="event-card__footer">
+          <Link href="/calendar" className="event-card__footer-link">
+            View full calendar
+          </Link>
+        </div>
+      )}
     </section>
   );
 }
