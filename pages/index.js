@@ -1,68 +1,53 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { useAuth, useSupabase } from "./_app";
+import { useAuth } from "./_app";
 
 export default function Home() {
   const router = useRouter();
   const { user, loading } = useAuth();
-  const supabase = useSupabase();
-  const [processingOAuth, setProcessingOAuth] = useState(false);
+  const [checkingOAuth, setCheckingOAuth] = useState(false);
   const isSignedIn = Boolean(user);
 
-  // Handle OAuth callback if code is present in URL
+  // Check if this is an OAuth callback and handle it
   useEffect(() => {
-    const handleOAuthCallback = async () => {
-      // Check if this is an OAuth callback with a code parameter
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const searchParams = new URLSearchParams(window.location.search);
-      const code = searchParams.get('code');
-      const accessToken = hashParams.get('access_token');
+    // Only run in browser
+    if (typeof window === 'undefined') return;
 
-      if (code && !processingOAuth) {
-        setProcessingOAuth(true);
-        console.log('[OAuth] Processing authorization code...');
+    // Check if we have OAuth parameters in the URL
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const hasCode = searchParams.has('code');
+    const hasAccessToken = hashParams.has('access_token');
 
-        try {
-          // Exchange code for session
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (hasCode || hasAccessToken) {
+      console.log('[OAuth] OAuth callback detected, waiting for Supabase to process...');
+      setCheckingOAuth(true);
 
-          if (error) {
-            console.error('[OAuth] Error exchanging code:', error);
-            router.push('/login?error=oauth_failed');
-          } else {
-            console.log('[OAuth] Successfully authenticated, redirecting to dashboard...');
-            router.push('/dashboard');
-          }
-        } catch (err) {
-          console.error('[OAuth] Exception during code exchange:', err);
-          router.push('/login?error=oauth_failed');
-        }
-        return;
-      }
+      // Supabase automatically handles the code exchange via onAuthStateChange
+      // Just wait a moment for the session to be established
+      const timer = setTimeout(() => {
+        // After session is established, user state will update and redirect will happen
+        setCheckingOAuth(false);
+      }, 2000);
 
-      // Handle implicit flow (hash-based tokens)
-      if (accessToken && !processingOAuth) {
-        setProcessingOAuth(true);
-        console.log('[OAuth] Access token found in URL hash, redirecting to dashboard...');
-        // The session is already set by Supabase, just redirect
-        router.push('/dashboard');
-        return;
-      }
-    };
-
-    handleOAuthCallback();
-  }, [router, supabase, processingOAuth]);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   // Redirect logged-in users to dashboard
   useEffect(() => {
-    if (!loading && user && !processingOAuth) {
+    if (!loading && user && !checkingOAuth) {
+      console.log('[OAuth] User authenticated, redirecting to dashboard...');
       router.replace("/dashboard");
     }
-  }, [loading, user, router, processingOAuth]);
+  }, [loading, user, router, checkingOAuth]);
 
   // Show loading state during OAuth processing
-  if (processingOAuth) {
+  const isOAuthCallback = typeof window !== 'undefined' &&
+    (window.location.search.includes('code=') || window.location.hash.includes('access_token='));
+
+  if (checkingOAuth || (loading && isOAuthCallback)) {
     return (
       <main className="home">
         <section className="home__hero" style={{ textAlign: 'center' }}>

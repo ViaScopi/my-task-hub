@@ -33,6 +33,7 @@ export default function App({ Component, pageProps }) {
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[Auth] Initial session loaded:', session ? 'authenticated' : 'not authenticated');
       setUser(session?.user ?? null);
       setLoading(false);
     });
@@ -40,8 +41,10 @@ export default function App({ Component, pageProps }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Auth] Auth state changed:', event, session ? 'authenticated' : 'not authenticated');
       setUser(session?.user ?? null);
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
