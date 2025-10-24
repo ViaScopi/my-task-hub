@@ -70,7 +70,8 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          // Redirect back to root, which will handle the OAuth callback
+          redirectTo: window.location.origin,
         },
       });
 
