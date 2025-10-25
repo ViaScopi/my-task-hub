@@ -169,6 +169,313 @@ export default function KanbanBoard() {
     });
   }, [tasks]);
 
+  // Initialize comments for all tasks
+  useEffect(() => {
+    setTaskComments((prev) => {
+      const next = { ...prev };
+      tasks.forEach((task) => {
+        if (!next[task.id]) {
+          next[task.id] = "";
+        }
+      });
+      return next;
+    });
+  }, [tasks]);
+
+  const toggleTaskExpanded = (taskId) => {
+    setExpandedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const updateTaskComment = (taskId, value) => {
+    setTaskComments((prev) => ({
+      ...prev,
+      [taskId]: value,
+    }));
+    setTaskStates((prev) => ({
+      ...prev,
+      [taskId]: {
+        ...(prev[taskId] || {}),
+        commentError: "",
+        commentSuccess: "",
+      },
+    }));
+  };
+
+  const submitComment = async (task) => {
+    const comment = taskComments[task.id]?.trim();
+
+    if (!comment) {
+      setTaskStates((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          commentError: "Please enter a comment",
+        },
+      }));
+      return;
+    }
+
+    setTaskStates((prev) => ({
+      ...prev,
+      [task.id]: {
+        ...(prev[task.id] || {}),
+        commentLoading: true,
+        commentError: "",
+        commentSuccess: "",
+      },
+    }));
+
+    try {
+      const response = await fetch("/api/task-comment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task, comment }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.details || data?.error || "Failed to add comment");
+      }
+
+      setTaskComments((prev) => ({
+        ...prev,
+        [task.id]: "",
+      }));
+
+      setTaskStates((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          commentLoading: false,
+          commentSuccess: "Comment added successfully",
+        },
+      }));
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      setTaskStates((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          commentLoading: false,
+          commentError: error.message || "Failed to add comment",
+        },
+      }));
+    }
+  };
+
+  const updateTaskPriority = async (task, newPriority) => {
+    if (!task || !task.originalId) {
+      setPriorityStatus((prev) => ({
+        ...prev,
+        [task.id]: { loading: false, error: "Task missing required originalId" },
+      }));
+      return;
+    }
+
+    setPriorityStatus((prev) => ({
+      ...prev,
+      [task.id]: { loading: true, error: "" },
+    }));
+
+    try {
+      const response = await fetch("/api/task-priority", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: task.source,
+          originalId: task.originalId,
+          priority: newPriority || null,
+        }),
+      });
+
+      const responseData = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = responseData?.error || "Failed to update task priority.";
+        const details = responseData?.details ? ` (${responseData.details})` : "";
+        throw new Error(message + details);
+      }
+
+      setTasks((prevTasks) =>
+        prevTasks.map((item) =>
+          item.id === task.id ? { ...item, priority: newPriority || null } : item
+        )
+      );
+
+      setPriorityStatus((prev) => {
+        const next = { ...prev };
+        delete next[task.id];
+        return next;
+      });
+    } catch (err) {
+      console.error("Failed to update task priority:", err);
+      setPriorityStatus((prev) => ({
+        ...prev,
+        [task.id]: { loading: false, error: err.message || "Unable to update priority." },
+      }));
+    }
+  };
+
+  const updatePipeline = async (task, targetListId) => {
+    if (!task || task.source !== "Google Tasks") {
+      return;
+    }
+
+    if (!targetListId || targetListId === task.pipelineId) {
+      return;
+    }
+
+    setPipelineStatus((prev) => ({
+      ...prev,
+      [task.id]: { loading: true, error: "" },
+    }));
+
+    try {
+      const response = await fetch("/api/google-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: task.googleTaskId,
+          currentListId: task.googleTaskListId,
+          targetListId,
+        }),
+      });
+
+      const responseData = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = responseData?.error || "Failed to update the Google Task pipeline.";
+        throw new Error(message);
+      }
+
+      const newGoogleTaskId = responseData?.task?.id || task.googleTaskId;
+      const newTaskListId = responseData?.task?.tasklist || targetListId;
+      const nextPipeline = task.pipelineOptions?.find((option) => option.id === newTaskListId);
+      const pipelineName = nextPipeline?.name || task.pipelineName;
+
+      setTasks((prevTasks) =>
+        prevTasks.map((item) => {
+          if (item.id !== task.id) {
+            return item;
+          }
+
+          const nextId = `google-${newGoogleTaskId}`;
+
+          return {
+            ...item,
+            id: nextId,
+            googleTaskId: newGoogleTaskId,
+            googleTaskListId: newTaskListId,
+            pipelineId: newTaskListId,
+            pipelineName,
+            repo: pipelineName,
+          };
+        })
+      );
+
+      setPipelineStatus((prev) => {
+        const next = { ...prev };
+        delete next[task.id];
+        return next;
+      });
+    } catch (err) {
+      console.error("Failed to update Google Task pipeline:", err);
+      setPipelineStatus((prev) => ({
+        ...prev,
+        [task.id]: { loading: false, error: err.message || "Unable to update pipeline." },
+      }));
+    }
+  };
+
+  const moveTrelloCard = async (task, targetListId) => {
+    const isTrello = task?.source === "Trello" || task?.source === "Fellow";
+    if (!task || !isTrello) {
+      return;
+    }
+
+    if (!targetListId || targetListId === task.pipelineId) {
+      return;
+    }
+
+    const selectedList = task.pipelineOptions?.find((option) => option.id === targetListId);
+
+    setTaskStates((prev) => ({
+      ...prev,
+      [task.id]: {
+        ...(prev[task.id] || {}),
+        moveLoading: true,
+        moveError: "",
+        moveSuccess: "",
+      },
+    }));
+
+    try {
+      const response = await fetch("/api/trello", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "move",
+          cardId: task.trelloCardId,
+          targetListId,
+        }),
+      });
+
+      const responseData = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = responseData?.error || "Failed to move the Trello card.";
+        throw new Error(message);
+      }
+
+      setTasks((prevTasks) =>
+        prevTasks.map((item) => {
+          if (item.id !== task.id) {
+            return item;
+          }
+
+          return {
+            ...item,
+            pipelineId: targetListId,
+            pipelineName: selectedList?.name || item.pipelineName,
+            trelloListId: targetListId,
+          };
+        })
+      );
+
+      setTaskStates((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          moveLoading: false,
+          moveError: "",
+          moveSuccess: selectedList?.name
+            ? `Moved to ${selectedList.name}.`
+            : "Card moved successfully.",
+        },
+      }));
+    } catch (err) {
+      console.error("Failed to move Trello card:", err);
+      setTaskStates((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          moveLoading: false,
+          moveError: err.message || "Unable to move the Trello card.",
+          moveSuccess: "",
+        },
+      }));
+    }
+  };
+
   const columns = useMemo(() => {
     const grouped = Object.fromEntries(STAGES.map((stage) => [stage, []]));
 
@@ -651,31 +958,189 @@ export default function KanbanBoard() {
                         ? "task-item__badge--trello"
                         : "task-item__badge--default";
                   const isDragging = draggedTaskId === task.id;
+                  const isExpanded = expandedTaskIds.has(task.id);
+                  const priorityState = priorityStatus[task.id] || {};
+                  const pipelineState = pipelineStatus[task.id] || {};
+                  const taskState = taskStates[task.id] || {};
+                  const comment = taskComments[task.id] ?? "";
+                  const isTrello = task?.source === "Trello" || task?.source === "Fellow";
 
                   return (
                     <li
                       key={task.id}
                       className={`kanban-board__card${
                         isDragging ? " kanban-board__card--dragging" : ""
-                      }`}
+                      }${isExpanded ? " kanban-board__card--expanded" : ""}`}
                       draggable
                       onDragStart={handleDragStart(task.id)}
                       onDragEnd={handleDragEnd}
                       aria-grabbed={isDragging}
                     >
-                      <div className="kanban-board__card-meta">
-                        <span className={`task-item__badge ${badgeClass}`}>{source}</span>
-                        {(task.repo || task.pipelineName) && (
-                          <p className="kanban-board__card-subtext">{task.repo || task.pipelineName}</p>
-                        )}
+                      {/* Header with badges and expand button */}
+                      <div className="kanban-board__card-header">
+                        <div className="kanban-board__card-badges">
+                          <span className={`task-item__badge ${badgeClass}`}>{source}</span>
+                          {task.priority && (
+                            <span className={`task-item__badge task-item__badge--priority-${task.priority}`}>
+                              {task.priority}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleTaskExpanded(task.id);
+                          }}
+                          className="kanban-board__expand-btn"
+                          aria-label={isExpanded ? "Collapse" : "Expand"}
+                        >
+                          {isExpanded ? "−" : "+"}
+                        </button>
                       </div>
-                      <p className="kanban-board__card-title">{task.title || task.name}</p>
-                      {task.description && (
-                        <p className="kanban-board__card-description">{task.description}</p>
+
+                      {/* Title */}
+                      <a
+                        href={task.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="kanban-board__card-title"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {task.title || task.name}
+                      </a>
+
+                      {/* Repo/Pipeline info */}
+                      {(task.repo || task.pipelineName) && (
+                        <p className="kanban-board__card-subtext">
+                          {task.source === "GitHub"
+                            ? task.repo
+                            : task.source === "Google Tasks"
+                            ? `Pipeline: ${task.pipelineName}`
+                            : isTrello && task.pipelineName
+                            ? `List: ${task.pipelineName} · ${task.repo}`
+                            : task.repo}
+                        </p>
                       )}
-                      <p className="kanban-board__stage-hint" role="note">
-                        Drag to move this task to a different stage.
-                      </p>
+
+                      {/* Description */}
+                      {task.description ? (
+                        <p className="kanban-board__card-description">{task.description}</p>
+                      ) : (
+                        !isExpanded && (
+                          <p className="kanban-board__card-description kanban-board__card-description--muted">
+                            No description provided.
+                          </p>
+                        )
+                      )}
+
+                      {/* Expanded section */}
+                      {isExpanded && (
+                        <div className="kanban-board__card-expanded" onClick={(e) => e.stopPropagation()}>
+                          {/* Priority Dropdown */}
+                          <div className="kanban-board__card-field">
+                            <label htmlFor={`kanban-priority-${task.id}`}>Priority</label>
+                            <select
+                              id={`kanban-priority-${task.id}`}
+                              className="kanban-board__card-select"
+                              value={task.priority || ""}
+                              onChange={(event) => updateTaskPriority(task, event.target.value)}
+                              disabled={Boolean(priorityState.loading)}
+                            >
+                              <option value="">None</option>
+                              <option value="low">Low</option>
+                              <option value="medium">Medium</option>
+                              <option value="high">High</option>
+                            </select>
+                            {priorityState.error && (
+                              <p className="kanban-board__card-error">{priorityState.error}</p>
+                            )}
+                          </div>
+
+                          {/* Pipeline/List Dropdown for Google Tasks */}
+                          {task.source === "Google Tasks" && task.pipelineOptions?.length > 0 && (
+                            <div className="kanban-board__card-field">
+                              <label htmlFor={`kanban-pipeline-${task.id}`}>Pipeline</label>
+                              <select
+                                id={`kanban-pipeline-${task.id}`}
+                                className="kanban-board__card-select"
+                                value={task.pipelineId}
+                                onChange={(event) => updatePipeline(task, event.target.value)}
+                                disabled={Boolean(pipelineState.loading)}
+                              >
+                                {task.pipelineOptions.map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.name}
+                                  </option>
+                                ))}
+                              </select>
+                              {pipelineState.error && (
+                                <p className="kanban-board__card-error">{pipelineState.error}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* List Dropdown for Trello */}
+                          {isTrello && task.pipelineOptions?.length > 0 && (
+                            <div className="kanban-board__card-field">
+                              <label htmlFor={`kanban-trello-list-${task.id}`}>List</label>
+                              <select
+                                id={`kanban-trello-list-${task.id}`}
+                                className="kanban-board__card-select"
+                                value={task.pipelineId}
+                                onChange={(event) => moveTrelloCard(task, event.target.value)}
+                                disabled={Boolean(taskState.moveLoading)}
+                              >
+                                {task.pipelineOptions.map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.name}
+                                  </option>
+                                ))}
+                              </select>
+                              {taskState.moveError && (
+                                <p className="kanban-board__card-error">{taskState.moveError}</p>
+                              )}
+                              {taskState.moveSuccess && (
+                                <p className="kanban-board__card-success">{taskState.moveSuccess}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Comment section */}
+                          <div className="kanban-board__card-field">
+                            <label htmlFor={`kanban-comment-${task.id}`}>Add a comment or note</label>
+                            <textarea
+                              id={`kanban-comment-${task.id}`}
+                              className="kanban-board__card-textarea"
+                              rows={3}
+                              value={comment}
+                              onChange={(event) => updateTaskComment(task.id, event.target.value)}
+                              placeholder="Share an update or note about this task…"
+                              disabled={Boolean(taskState.commentLoading)}
+                            />
+                            {taskState.commentError && (
+                              <p className="kanban-board__card-error">{taskState.commentError}</p>
+                            )}
+                            {taskState.commentSuccess && (
+                              <p className="kanban-board__card-success">{taskState.commentSuccess}</p>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => submitComment(task)}
+                              className="kanban-board__card-btn kanban-board__card-btn--secondary"
+                              disabled={Boolean(taskState.commentLoading)}
+                            >
+                              {taskState.commentLoading ? "Posting..." : "Add Comment"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {!isExpanded && (
+                        <p className="kanban-board__stage-hint" role="note">
+                          Drag to move • Click + to manage
+                        </p>
+                      )}
                     </li>
                   );
                 })}
