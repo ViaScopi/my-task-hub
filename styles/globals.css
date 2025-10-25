@@ -472,6 +472,64 @@ main {
   border-top: 1px solid rgba(99, 102, 241, 0.12);
 }
 
+/* Filter Controls for Dashboard */
+.filter-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 18px;
+  border: 1px solid rgba(99, 102, 241, 0.1);
+  margin-bottom: 1rem;
+}
+
+.filter-controls__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.filter-controls__label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--slate-700);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.filter-controls__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.filter-controls__button {
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--slate-600);
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  font-family: inherit;
+}
+
+.filter-controls__button:hover {
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--slate-700);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.filter-controls__button--active {
+  background: rgba(99, 102, 241, 0.16);
+  color: var(--accent-strong);
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 12px 24px -18px rgba(79, 70, 229, 0.5);
+}
+
 .button--small {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
@@ -1242,6 +1300,51 @@ main {
   background: rgba(99, 102, 241, 0.14);
   color: var(--accent-strong);
   box-shadow: 0 12px 24px -18px rgba(79, 70, 229, 0.5);
+}
+
+/* Sorting Controls for Kanban */
+.kanban-board__sort-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.12);
+}
+
+.kanban-board__sort-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.kanban-board__sort-label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--slate-700);
+}
+
+.kanban-board__sort-select {
+  border-radius: 999px;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--slate-700);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kanban-board__sort-select:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.kanban-board__sort-select:hover {
+  border-color: rgba(99, 102, 241, 0.4);
 }
 
 .kanban-board__error {
