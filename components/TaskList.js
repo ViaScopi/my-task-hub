@@ -43,99 +43,212 @@ function formatStatus(value) {
 
 export default function TaskList() {
   const { tasks, setTasks, loading, fetchError } = useTasks();
-  const [activeTaskId, setActiveTaskId] = useState(null);
-  const [completionNote, setCompletionNote] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [completionError, setCompletionError] = useState("");
-  const [pipelineStatus, setPipelineStatus] = useState({});
-  const [trelloCardStatus, setTrelloCardStatus] = useState({});
-  const [trelloComments, setTrelloComments] = useState({});
+  const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
+  const [taskComments, setTaskComments] = useState({});
+  const [taskStates, setTaskStates] = useState({});
   const [priorityStatus, setPriorityStatus] = useState({});
+  const [pipelineStatus, setPipelineStatus] = useState({});
 
   useEffect(() => {
-    setTrelloCardStatus((prev) => {
-      const next = {};
+    // Initialize comments for all tasks
+    setTaskComments((prev) => {
+      const next = { ...prev };
       tasks.forEach((task) => {
-        if (isTrelloTask(task) && prev[task.id]) {
-          next[task.id] = prev[task.id];
-        }
-      });
-      return next;
-    });
-
-    setTrelloComments((prev) => {
-      const next = {};
-      tasks.forEach((task) => {
-        if (isTrelloTask(task)) {
-          next[task.id] = prev[task.id] ?? "";
+        if (!next[task.id]) {
+          next[task.id] = "";
         }
       });
       return next;
     });
   }, [tasks]);
 
-  const startCompletion = (task) => {
-    if (!task || task.source !== "GitHub") {
-      return;
-    }
-
-    setActiveTaskId(task.id);
-    setCompletionNote("");
-    setCompletionError("");
+  const toggleTaskExpanded = (taskId) => {
+    setExpandedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
   };
 
-  const cancelCompletion = () => {
-    if (submitting) {
-      return;
-    }
-
-    setActiveTaskId(null);
-    setCompletionNote("");
-    setCompletionError("");
+  const updateTaskComment = (taskId, value) => {
+    setTaskComments((prev) => ({
+      ...prev,
+      [taskId]: value,
+    }));
+    // Clear errors when user types
+    setTaskStates((prev) => ({
+      ...prev,
+      [taskId]: {
+        ...(prev[taskId] || {}),
+        commentError: "",
+        commentSuccess: "",
+      },
+    }));
   };
 
-  const completeTask = async (task, note) => {
-    if (!task || task.source !== "GitHub") {
+  const submitComment = async (task) => {
+    const comment = taskComments[task.id]?.trim();
+
+    if (!comment) {
+      setTaskStates((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          commentError: "Please enter a comment",
+        },
+      }));
       return;
     }
 
-    const trimmedNote = note.trim();
-
-    if (!trimmedNote) {
-      setCompletionError("Please add a note about what was completed.");
-      return;
-    }
+    setTaskStates((prev) => ({
+      ...prev,
+      [task.id]: {
+        ...(prev[task.id] || {}),
+        commentLoading: true,
+        commentError: "",
+        commentSuccess: "",
+      },
+    }));
 
     try {
-      setSubmitting(true);
-      setCompletionError("");
+      const response = await fetch("/api/task-comment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task, comment }),
+      });
 
-      const response = await fetch("/api/github", {
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.details || data?.error || "Failed to add comment");
+      }
+
+      setTaskComments((prev) => ({
+        ...prev,
+        [task.id]: "",
+      }));
+
+      setTaskStates((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          commentLoading: false,
+          commentSuccess: "Comment added successfully",
+        },
+      }));
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      setTaskStates((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          commentLoading: false,
+          commentError: error.message || "Failed to add comment",
+        },
+      }));
+    }
+  };
+
+  const completeTask = async (task) => {
+    const note = taskComments[task.id]?.trim() || "";
+
+    setTaskStates((prev) => ({
+      ...prev,
+      [task.id]: {
+        ...(prev[task.id] || {}),
+        completeLoading: true,
+        completeError: "",
+      },
+    }));
+
+    try {
+      const response = await fetch("/api/task-complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task, note }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.details || data?.error || "Failed to complete task");
+      }
+
+      // Remove from task list
+      setTasks((prevTasks) => prevTasks.filter((item) => item.id !== task.id));
+      setExpandedTaskIds((prev) => {
+        const next = new Set(prev);
+        next.delete(task.id);
+        return next;
+      });
+    } catch (error) {
+      console.error("Error completing task:", error);
+      setTaskStates((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          completeLoading: false,
+          completeError: error.message || "Failed to complete task",
+        },
+      }));
+    }
+  };
+
+  const updateTaskPriority = async (task, newPriority) => {
+    if (!task || !task.originalId) {
+      console.error("Missing task or originalId:", { task, hasOriginalId: !!task?.originalId });
+      setPriorityStatus((prev) => ({
+        ...prev,
+        [task.id]: { loading: false, error: "Task missing required originalId" },
+      }));
+      return;
+    }
+
+    setPriorityStatus((prev) => ({
+      ...prev,
+      [task.id]: { loading: true, error: "" },
+    }));
+
+    try {
+      const response = await fetch("/api/task-priority", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          owner: task.repo.split("/")[0],
-          repo: task.repo.split("/")[1],
-          issue_number: task.issue_number,
-          comment: trimmedNote,
+          source: task.source,
+          originalId: task.originalId,
+          priority: newPriority || null,
         }),
       });
 
       const responseData = await response.json().catch(() => null);
 
       if (!response.ok) {
-        const message = responseData?.error || "Failed to complete the task.";
-        throw new Error(message);
+        const message = responseData?.error || "Failed to update task priority.";
+        const details = responseData?.details ? ` (${responseData.details})` : "";
+        throw new Error(message + details);
       }
 
-      setTasks((prevTasks) => prevTasks.filter((item) => item.id !== task.id));
-      setActiveTaskId(null);
-      setCompletionNote("");
+      setTasks((prevTasks) =>
+        prevTasks.map((item) =>
+          item.id === task.id ? { ...item, priority: newPriority || null } : item
+        )
+      );
+
+      setPriorityStatus((prev) => {
+        const next = { ...prev };
+        delete next[task.id];
+        return next;
+      });
     } catch (err) {
-      console.error("Error completing task:", err);
-      setCompletionError(err.message || "An unexpected error occurred.");
-    } finally {
-      setSubmitting(false);
+      console.error("Failed to update task priority:", err);
+      setPriorityStatus((prev) => ({
+        ...prev,
+        [task.id]: { loading: false, error: err.message || "Unable to update priority." },
+      }));
     }
   };
 
@@ -221,7 +334,7 @@ export default function TaskList() {
 
     const selectedList = task.pipelineOptions?.find((option) => option.id === targetListId);
 
-    setTrelloCardStatus((prev) => ({
+    setTaskStates((prev) => ({
       ...prev,
       [task.id]: {
         ...(prev[task.id] || {}),
@@ -264,7 +377,7 @@ export default function TaskList() {
         })
       );
 
-      setTrelloCardStatus((prev) => ({
+      setTaskStates((prev) => ({
         ...prev,
         [task.id]: {
           ...(prev[task.id] || {}),
@@ -277,7 +390,7 @@ export default function TaskList() {
       }));
     } catch (err) {
       console.error("Failed to move Trello card:", err);
-      setTrelloCardStatus((prev) => ({
+      setTaskStates((prev) => ({
         ...prev,
         [task.id]: {
           ...(prev[task.id] || {}),
@@ -285,145 +398,6 @@ export default function TaskList() {
           moveError: err.message || "Unable to move the Trello card.",
           moveSuccess: "",
         },
-      }));
-    }
-  };
-
-  const submitTrelloComment = async (task) => {
-    if (!task || task.source !== "Trello") {
-      return;
-    }
-
-    const draftComment = trelloComments[task.id] ?? "";
-    const trimmedComment = draftComment.trim();
-
-    if (!trimmedComment) {
-      setTrelloCardStatus((prev) => ({
-        ...prev,
-        [task.id]: {
-          ...(prev[task.id] || {}),
-          commentError: "Please add a comment before submitting.",
-          commentSuccess: "",
-        },
-      }));
-      return;
-    }
-
-    setTrelloCardStatus((prev) => ({
-      ...prev,
-      [task.id]: {
-        ...(prev[task.id] || {}),
-        commentLoading: true,
-        commentError: "",
-        commentSuccess: "",
-      },
-    }));
-
-    try {
-      const response = await fetch("/api/trello", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "comment",
-          cardId: task.trelloCardId,
-          comment: trimmedComment,
-        }),
-      });
-
-      const responseData = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        const message = responseData?.error || "Failed to add the Trello comment.";
-        throw new Error(message);
-      }
-
-      setTrelloComments((prev) => ({
-        ...prev,
-        [task.id]: "",
-      }));
-
-      setTrelloCardStatus((prev) => ({
-        ...prev,
-        [task.id]: {
-          ...(prev[task.id] || {}),
-          commentLoading: false,
-          commentError: "",
-          commentSuccess: "Comment added successfully.",
-        },
-      }));
-    } catch (err) {
-      console.error("Failed to add Trello comment:", err);
-      setTrelloCardStatus((prev) => ({
-        ...prev,
-        [task.id]: {
-          ...(prev[task.id] || {}),
-          commentLoading: false,
-          commentError: err.message || "Unable to add the Trello comment.",
-          commentSuccess: "",
-        },
-      }));
-    }
-  };
-
-  const updateTaskPriority = async (task, newPriority) => {
-    if (!task || !task.originalId) {
-      console.error("Missing task or originalId:", { task, hasOriginalId: !!task?.originalId });
-      setPriorityStatus((prev) => ({
-        ...prev,
-        [task.id]: { loading: false, error: "Task missing required originalId" },
-      }));
-      return;
-    }
-
-    console.log("Updating task priority:", {
-      id: task.id,
-      source: task.source,
-      originalId: task.originalId,
-      newPriority
-    });
-
-    setPriorityStatus((prev) => ({
-      ...prev,
-      [task.id]: { loading: true, error: "" },
-    }));
-
-    try {
-      const response = await fetch("/api/task-priority", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: task.source,
-          originalId: task.originalId,
-          priority: newPriority || null, // null will remove the priority
-        }),
-      });
-
-      const responseData = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        console.error("Priority update failed:", responseData);
-        const message = responseData?.error || "Failed to update task priority.";
-        const details = responseData?.details ? ` (${responseData.details})` : "";
-        throw new Error(message + details);
-      }
-
-      // Update local task list
-      setTasks((prevTasks) =>
-        prevTasks.map((item) =>
-          item.id === task.id ? { ...item, priority: newPriority || null } : item
-        )
-      );
-
-      setPriorityStatus((prev) => {
-        const next = { ...prev };
-        delete next[task.id];
-        return next;
-      });
-    } catch (err) {
-      console.error("Failed to update task priority:", err);
-      setPriorityStatus((prev) => ({
-        ...prev,
-        [task.id]: { loading: false, error: err.message || "Unable to update priority." },
       }));
     }
   };
@@ -471,18 +445,19 @@ export default function TaskList() {
 
       <ul className="task-card__items">
         {tasks.map((task) => {
-          const isActive = activeTaskId === task.id;
+          const isExpanded = expandedTaskIds.has(task.id);
           const description = task.description?.trim();
           const badgeClass = SOURCE_BADGE_CLASS[task.source] || "default";
-          const pipelineState = pipelineStatus[task.id] || {};
           const priorityState = priorityStatus[task.id] || {};
-          const trelloState = trelloCardStatus[task.id] || {};
-          const trelloComment = trelloComments[task.id] ?? "";
+          const pipelineState = pipelineStatus[task.id] || {};
+          const taskState = taskStates[task.id] || {};
+          const comment = taskComments[task.id] ?? "";
           const dueLabel = formatDueDate(task.dueDate || task.due);
           const statusLabel = formatStatus(task.status);
 
           return (
-            <li key={task.id} className={`task-item${isActive ? " task-item--active" : ""}`}>
+            <li key={task.id} className="task-item">
+              {/* Title and Badges */}
               <div className="task-item__meta">
                 <div className="task-item__heading">
                   <div className="task-item__title-row">
@@ -522,75 +497,16 @@ export default function TaskList() {
                     </p>
                   )}
                 </div>
-                {task.source === "GitHub" && !isActive && (
-                  <button
-                    type="button"
-                    onClick={() => startCompletion(task)}
-                    className="button button--success"
-                  >
-                    Mark done
-                  </button>
-                )}
-              </div>
-
-              <div className="task-item__priority">
-                <label htmlFor={`priority-${task.id}`}>Priority</label>
-                <select
-                  id={`priority-${task.id}`}
-                  className="task-item__priority-select"
-                  value={task.priority || ""}
-                  onChange={(event) => updateTaskPriority(task, event.target.value)}
-                  disabled={Boolean(priorityState.loading)}
+                <button
+                  type="button"
+                  onClick={() => toggleTaskExpanded(task.id)}
+                  className="button button--primary button--small"
                 >
-                  <option value="">None</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-                {priorityState.error && <p className="task-item__error">{priorityState.error}</p>}
+                  {isExpanded ? "Collapse" : "Expand"}
+                </button>
               </div>
 
-              {task.source === "Google Tasks" && task.pipelineOptions?.length > 0 && (
-                <div className="task-item__pipeline">
-                  <label htmlFor={`pipeline-${task.id}`}>Pipeline</label>
-                  <select
-                    id={`pipeline-${task.id}`}
-                    className="task-item__pipeline-select"
-                    value={task.pipelineId}
-                    onChange={(event) => updatePipeline(task, event.target.value)}
-                    disabled={Boolean(pipelineState.loading)}
-                  >
-                    {task.pipelineOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
-                  {pipelineState.error && <p className="task-item__error">{pipelineState.error}</p>}
-                </div>
-              )}
-
-              {isTrelloTask(task) && task.pipelineOptions?.length > 0 && (
-                <div className="task-item__pipeline">
-                  <label htmlFor={`trello-pipeline-${task.id}`}>List</label>
-                  <select
-                    id={`trello-pipeline-${task.id}`}
-                    className="task-item__pipeline-select"
-                    value={task.pipelineId}
-                    onChange={(event) => moveTrelloCard(task, event.target.value)}
-                    disabled={Boolean(trelloState.moveLoading)}
-                  >
-                    {task.pipelineOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
-                  {trelloState.moveError && <p className="task-item__error">{trelloState.moveError}</p>}
-                  {trelloState.moveSuccess && <p className="task-item__success">{trelloState.moveSuccess}</p>}
-                </div>
-              )}
-
+              {/* Description */}
               {description ? (
                 <p className="task-item__description">{description}</p>
               ) : (
@@ -599,80 +515,110 @@ export default function TaskList() {
                 </p>
               )}
 
-              {isActive && task.source === "GitHub" && (
-                <div className="task-item__completion">
-                  <label htmlFor={`completion-note-${task.id}`}>
-                    Add a note about what was completed
-                  </label>
-                  <textarea
-                    id={`completion-note-${task.id}`}
-                    className="task-item__note"
-                    rows={4}
-                    value={completionNote}
-                    onChange={(event) => setCompletionNote(event.target.value)}
-                    placeholder="Share what you accomplished before closing the issue…"
-                    disabled={submitting}
-                  />
-                  {completionError && <p className="task-item__error">{completionError}</p>}
-                  <div className="task-item__actions">
-                    <button
-                      type="button"
-                      onClick={() => completeTask(task, completionNote)}
-                      className="button button--primary"
-                      disabled={submitting}
+              {/* Expanded Section */}
+              {isExpanded && (
+                <div className="task-item__expanded">
+                  {/* Priority Dropdown */}
+                  <div className="task-item__priority">
+                    <label htmlFor={`priority-${task.id}`}>Priority</label>
+                    <select
+                      id={`priority-${task.id}`}
+                      className="task-item__priority-select"
+                      value={task.priority || ""}
+                      onChange={(event) => updateTaskPriority(task, event.target.value)}
+                      disabled={Boolean(priorityState.loading)}
                     >
-                      {submitting ? "Saving..." : "Submit & Close"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cancelCompletion}
-                      className="button button--ghost"
-                      disabled={submitting}
-                    >
-                      Cancel
-                    </button>
+                      <option value="">None</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                    {priorityState.error && <p className="task-item__error">{priorityState.error}</p>}
                   </div>
-                </div>
-              )}
 
-              {isTrelloTask(task) && (
-                <div className="task-item__completion">
-                  <label htmlFor={`trello-comment-${task.id}`}>Add a comment to this card</label>
-                  <textarea
-                    id={`trello-comment-${task.id}`}
-                    className="task-item__note"
-                    rows={3}
-                    value={trelloComment}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      setTrelloComments((prev) => ({
-                        ...prev,
-                        [task.id]: value,
-                      }));
-                      setTrelloCardStatus((prev) => ({
-                        ...prev,
-                        [task.id]: {
-                          ...(prev[task.id] || {}),
-                          commentError: "",
-                          commentSuccess: "",
-                        },
-                      }));
-                    }}
-                    placeholder="Share an update with your teammates…"
-                    disabled={Boolean(trelloState.commentLoading)}
-                  />
-                  {trelloState.commentError && <p className="task-item__error">{trelloState.commentError}</p>}
-                  {trelloState.commentSuccess && (
-                    <p className="task-item__success">{trelloState.commentSuccess}</p>
+                  {/* Pipeline/List Dropdown for Google Tasks */}
+                  {task.source === "Google Tasks" && task.pipelineOptions?.length > 0 && (
+                    <div className="task-item__pipeline">
+                      <label htmlFor={`pipeline-${task.id}`}>Pipeline</label>
+                      <select
+                        id={`pipeline-${task.id}`}
+                        className="task-item__pipeline-select"
+                        value={task.pipelineId}
+                        onChange={(event) => updatePipeline(task, event.target.value)}
+                        disabled={Boolean(pipelineState.loading)}
+                      >
+                        {task.pipelineOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+                      {pipelineState.error && <p className="task-item__error">{pipelineState.error}</p>}
+                    </div>
                   )}
-                  <div className="task-item__actions">
+
+                  {/* List Dropdown for Trello */}
+                  {isTrelloTask(task) && task.pipelineOptions?.length > 0 && (
+                    <div className="task-item__pipeline">
+                      <label htmlFor={`trello-pipeline-${task.id}`}>List</label>
+                      <select
+                        id={`trello-pipeline-${task.id}`}
+                        className="task-item__pipeline-select"
+                        value={task.pipelineId}
+                        onChange={(event) => moveTrelloCard(task, event.target.value)}
+                        disabled={Boolean(taskState.moveLoading)}
+                      >
+                        {task.pipelineOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+                      {taskState.moveError && <p className="task-item__error">{taskState.moveError}</p>}
+                      {taskState.moveSuccess && <p className="task-item__success">{taskState.moveSuccess}</p>}
+                    </div>
+                  )}
+
+                  {/* Unified Comment Section */}
+                  <div className="task-item__comment-section">
+                    <label htmlFor={`comment-${task.id}`}>Add a comment or note</label>
+                    <textarea
+                      id={`comment-${task.id}`}
+                      className="task-item__note"
+                      rows={3}
+                      value={comment}
+                      onChange={(event) => updateTaskComment(task.id, event.target.value)}
+                      placeholder="Share an update or note about this task…"
+                      disabled={Boolean(taskState.commentLoading)}
+                    />
+                    {taskState.commentError && <p className="task-item__error">{taskState.commentError}</p>}
+                    {taskState.commentSuccess && (
+                      <p className="task-item__success">{taskState.commentSuccess}</p>
+                    )}
+                    <div className="task-item__actions">
+                      <button
+                        type="button"
+                        onClick={() => submitComment(task)}
+                        className="button button--ghost button--small"
+                        disabled={Boolean(taskState.commentLoading)}
+                      >
+                        {taskState.commentLoading ? "Posting..." : "Add Comment"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Unified Complete Button */}
+                  <div className="task-item__completion-section">
+                    {taskState.completeError && (
+                      <p className="task-item__error">{taskState.completeError}</p>
+                    )}
                     <button
                       type="button"
-                      onClick={() => submitTrelloComment(task)}
-                      className="button button--primary"
-                      disabled={Boolean(trelloState.commentLoading)}
+                      onClick={() => completeTask(task)}
+                      className="button button--success"
+                      disabled={Boolean(taskState.completeLoading)}
                     >
-                      {trelloState.commentLoading ? "Posting..." : "Add comment"}
+                      {taskState.completeLoading ? "Completing..." : "Mark Complete"}
                     </button>
                   </div>
                 </div>
