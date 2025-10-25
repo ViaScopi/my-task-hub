@@ -63,7 +63,7 @@ async function fetchTasksForList(accessToken, listId) {
   do {
     const url = new URL(`${TASKS_BASE_URL}/lists/${encodeURIComponent(listId)}/tasks`);
     url.searchParams.set("maxResults", "100");
-    url.searchParams.set("showCompleted", "false");
+    url.searchParams.set("showCompleted", "true");
     url.searchParams.set("showDeleted", "false");
     url.searchParams.set("showHidden", "false");
     if (pageToken) {

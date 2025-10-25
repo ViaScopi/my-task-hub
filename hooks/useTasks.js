@@ -63,79 +63,36 @@ function normalizeCompletedSnapshot(snapshot) {
   return ensureOriginalId(base);
 }
 
-export function mergeTasksWithCompletions(integrationTasks = [], completedSnapshots = []) {
-  const map = new Map();
-  const ordered = [];
+export function filterArchivedTasks(integrationTasks = [], archivedSnapshots = []) {
+  // Create a Set of archived task keys for fast lookup
+  const archivedKeys = new Set();
 
-  const upsertTask = (task, { markCompleted = false } = {}) => {
-    if (!task || typeof task !== "object") {
+  archivedSnapshots.forEach((snapshot) => {
+    if (!snapshot || typeof snapshot !== "object") {
       return;
     }
+    const originalId = snapshot.original_id ?? snapshot.originalId ?? deriveOriginalId(snapshot);
+    const source = snapshot.source;
+    if (source && originalId) {
+      const key = buildTaskKey(source, originalId);
+      if (key) {
+        archivedKeys.add(key);
+      }
+    }
+  });
 
+  // Filter out archived tasks from integration tasks
+  return integrationTasks.filter((task) => {
+    if (!task || typeof task !== "object") {
+      return false;
+    }
     const normalizedTask = ensureOriginalId(task);
     const key = buildTaskKey(normalizedTask.source, normalizedTask.originalId);
-
     if (!key) {
-      return;
+      return true; // Include tasks without keys
     }
-
-    const existing = map.get(key);
-    const completedStatus = markCompleted
-      ? normalizedTask.status || "Completed locally"
-      : normalizedTask.status;
-
-    if (existing) {
-      const mergedTask = {
-        ...existing.task,
-        ...normalizedTask,
-      };
-
-      if (markCompleted) {
-        mergedTask.locallyCompleted = true;
-        mergedTask.status = completedStatus || existing.task.status || "Completed locally";
-        mergedTask.completedAt =
-          normalizedTask.completedAt || existing.task.completedAt || new Date().toISOString();
-        mergedTask.notes = normalizedTask.notes ?? existing.task.notes;
-        mergedTask.id = existing.task.id || normalizedTask.id || mergedTask.id;
-      }
-
-      const preserveFields = ["url", "repo", "pipelineName", "pipelineId", "description", "title", "name"];
-      for (const field of preserveFields) {
-        if (mergedTask[field] == null && existing.task[field] != null) {
-          mergedTask[field] = existing.task[field];
-        }
-      }
-
-      ordered[existing.index] = mergedTask;
-      map.set(key, { index: existing.index, task: mergedTask });
-      return;
-    }
-
-    const entry = { ...normalizedTask };
-
-    if (markCompleted) {
-      entry.locallyCompleted = true;
-      entry.status = completedStatus || "Completed locally";
-      entry.completedAt = entry.completedAt || new Date().toISOString();
-    }
-
-    if (!entry.id) {
-      entry.id = `completed-${key.replace(/[^a-zA-Z0-9]/g, "-")}`;
-    }
-
-    ordered.push(entry);
-    map.set(key, { index: ordered.length - 1, task: entry });
-  };
-
-  integrationTasks.forEach((task) => upsertTask(task));
-  completedSnapshots
-    .map((snapshot) => normalizeCompletedSnapshot(snapshot))
-    .filter(Boolean)
-    .forEach((snapshotTask) => {
-      upsertTask(snapshotTask, { markCompleted: true });
-    });
-
-  return ordered;
+    return !archivedKeys.has(key); // Exclude if archived
+  });
 }
 
 export function useTasks() {
@@ -185,11 +142,11 @@ export function useTasks() {
 
             return Array.isArray(data) ? data : [];
           }),
-          fetch("/api/completed-tasks", { signal }).then(async (response) => {
+          fetch("/api/archived-tasks", { signal }).then(async (response) => {
             const data = await response.json().catch(() => null);
 
             if (!response.ok) {
-              const error = new Error(data?.error || "Failed to load completed task history.");
+              const error = new Error(data?.error || "Failed to load archived task history.");
               error.status = response.status;
               throw error;
             }
@@ -215,7 +172,7 @@ export function useTasks() {
         }
 
         const integrationTasks = [];
-        const completedSnapshots = [];
+        const archivedSnapshots = [];
         const errors = [];
 
         if (githubResult.status === "fulfilled") {
@@ -246,10 +203,10 @@ export function useTasks() {
         }
 
         if (completedResult.status === "fulfilled") {
-          completedSnapshots.push(...completedResult.value);
+          archivedSnapshots.push(...completedResult.value);
         } else {
-          errors.push("Completed tasks history");
-          console.error("Failed to load completed task history:", completedResult.reason);
+          errors.push("Archived tasks history");
+          console.error("Failed to load archived task history:", completedResult.reason);
         }
 
         // Get priorities map
@@ -258,10 +215,10 @@ export function useTasks() {
           priorities = prioritiesResult.value || {};
         }
 
-        const mergedTasks = mergeTasksWithCompletions(integrationTasks, completedSnapshots);
+        const filteredTasks = filterArchivedTasks(integrationTasks, archivedSnapshots);
 
         // Add priorities to tasks
-        const tasksWithPriorities = mergedTasks.map((task) => {
+        const tasksWithPriorities = filteredTasks.map((task) => {
           const priorityKey = `${task.source}:${task.originalId}`;
           const priority = priorities[priorityKey] || null;
           return { ...task, priority };
