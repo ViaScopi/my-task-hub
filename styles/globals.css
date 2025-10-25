@@ -240,6 +240,10 @@ main {
   transition: color 0.2s ease;
   min-width: 0;
   flex: 1 1 auto;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  white-space: normal;
 }
 
 .task-item__title:hover {
@@ -2230,9 +2234,9 @@ img, video, iframe, svg {
   max-width: 100%;
 }
 
-/* Ensure links in tasks can break anywhere to prevent overflow */
-.task-item a,
-.event-item a {
+/* Ensure links in task descriptions can break anywhere to prevent overflow */
+.task-item__description a,
+.event-item__description a {
   overflow-wrap: anywhere;
   word-break: break-all;
   max-width: 100%;
@@ -2251,7 +2255,8 @@ img, video, iframe, svg {
 }
 
 /* Prevent long URLs and emails from breaking layout */
-a, .settings-info__value {
+a:not(.task-item__title):not(.event-item__title),
+.settings-info__value {
   word-break: break-word;
   overflow-wrap: break-word;
 }
