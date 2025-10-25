@@ -138,11 +138,6 @@ export default function KanbanBoard() {
     submitting: false,
     previousStage: null,
   });
-  const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
-  const [taskComments, setTaskComments] = useState({});
-  const [taskStates, setTaskStates] = useState({});
-  const [priorityStatus, setPriorityStatus] = useState({});
-  const [pipelineStatus, setPipelineStatus] = useState({});
 
   useEffect(() => {
     setTaskStages((prev) => {
