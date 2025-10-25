@@ -143,6 +143,8 @@ export default function KanbanBoard() {
   const [taskStates, setTaskStates] = useState({});
   const [priorityStatus, setPriorityStatus] = useState({});
   const [pipelineStatus, setPipelineStatus] = useState({});
+  const [sortBy, setSortBy] = useState("none");
+  const [sortOrder, setSortOrder] = useState("asc");
 
   useEffect(() => {
     setTaskStages((prev) => {
@@ -493,8 +495,31 @@ export default function KanbanBoard() {
       grouped[stage].push(task);
     });
 
+    // Apply sorting to each column
+    if (sortBy !== "none") {
+      Object.keys(grouped).forEach((stage) => {
+        grouped[stage].sort((a, b) => {
+          let compareValue = 0;
+
+          if (sortBy === "source") {
+            const sourceA = getSourceKey(a) || "";
+            const sourceB = getSourceKey(b) || "";
+            compareValue = sourceA.localeCompare(sourceB);
+          } else if (sortBy === "priority") {
+            const priorityOrder = { high: 3, medium: 2, low: 1, "": 0, null: 0, undefined: 0 };
+            const priorityA = priorityOrder[a.priority] || 0;
+            const priorityB = priorityOrder[b.priority] || 0;
+            compareValue = priorityB - priorityA; // Higher priority first by default
+          }
+
+          // Apply sort order
+          return sortOrder === "asc" ? compareValue : -compareValue;
+        });
+      });
+    }
+
     return grouped;
-  }, [taskStages, tasks, visibleSources]);
+  }, [taskStages, tasks, visibleSources, sortBy, sortOrder]);
 
   const toggleSource = (source) => {
     setVisibleSources((prev) => ({
@@ -921,6 +946,39 @@ export default function KanbanBoard() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Sorting Controls */}
+      <div className="kanban-board__sort-controls">
+        <div className="kanban-board__sort-group">
+          <label className="kanban-board__sort-label">Sort by:</label>
+          <select
+            className="kanban-board__sort-select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="none">None</option>
+            <option value="source">Source</option>
+            <option value="priority">Priority</option>
+          </select>
+        </div>
+        {sortBy !== "none" && (
+          <div className="kanban-board__sort-group">
+            <label className="kanban-board__sort-label">Order:</label>
+            <select
+              className="kanban-board__sort-select"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+            >
+              <option value="asc">
+                {sortBy === "priority" ? "High to Low" : "Ascending"}
+              </option>
+              <option value="desc">
+                {sortBy === "priority" ? "Low to High" : "Descending"}
+              </option>
+            </select>
+          </div>
+        )}
       </div>
 
       {fetchError && <p className="kanban-board__error">{fetchError}</p>}

@@ -48,6 +48,8 @@ export default function TaskList() {
   const [taskStates, setTaskStates] = useState({});
   const [priorityStatus, setPriorityStatus] = useState({});
   const [pipelineStatus, setPipelineStatus] = useState({});
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
 
   useEffect(() => {
     // Initialize comments for all tasks
@@ -413,6 +415,27 @@ export default function TaskList() {
     );
   }
 
+  // Apply filters
+  const filteredTasks = tasks.filter((task) => {
+    // Source filter
+    if (sourceFilter !== "all" && task.source !== sourceFilter) {
+      return false;
+    }
+    // Priority filter
+    if (priorityFilter !== "all") {
+      if (priorityFilter === "none" && task.priority) {
+        return false;
+      }
+      if (priorityFilter !== "none" && task.priority !== priorityFilter) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  // Get unique sources for filter buttons
+  const availableSources = ["all", ...new Set(tasks.map((task) => task.source))];
+
   if (!tasks.length) {
     return (
       <div className="task-card">
@@ -443,8 +466,85 @@ export default function TaskList() {
 
       {fetchError && <p className="task-card__notice task-card__notice--warning">{fetchError}</p>}
 
-      <ul className="task-card__items">
-        {tasks.map((task) => {
+      {/* Filter Controls */}
+      <div className="filter-controls">
+        <div className="filter-controls__group">
+          <label className="filter-controls__label">Source</label>
+          <div className="filter-controls__buttons">
+            {availableSources.map((source) => (
+              <button
+                key={source}
+                type="button"
+                onClick={() => setSourceFilter(source)}
+                className={`filter-controls__button${
+                  sourceFilter === source ? " filter-controls__button--active" : ""
+                }`}
+              >
+                {source === "all" ? "All" : source}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="filter-controls__group">
+          <label className="filter-controls__label">Priority</label>
+          <div className="filter-controls__buttons">
+            <button
+              type="button"
+              onClick={() => setPriorityFilter("all")}
+              className={`filter-controls__button${
+                priorityFilter === "all" ? " filter-controls__button--active" : ""
+              }`}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setPriorityFilter("high")}
+              className={`filter-controls__button${
+                priorityFilter === "high" ? " filter-controls__button--active" : ""
+              }`}
+            >
+              High
+            </button>
+            <button
+              type="button"
+              onClick={() => setPriorityFilter("medium")}
+              className={`filter-controls__button${
+                priorityFilter === "medium" ? " filter-controls__button--active" : ""
+              }`}
+            >
+              Medium
+            </button>
+            <button
+              type="button"
+              onClick={() => setPriorityFilter("low")}
+              className={`filter-controls__button${
+                priorityFilter === "low" ? " filter-controls__button--active" : ""
+              }`}
+            >
+              Low
+            </button>
+            <button
+              type="button"
+              onClick={() => setPriorityFilter("none")}
+              className={`filter-controls__button${
+                priorityFilter === "none" ? " filter-controls__button--active" : ""
+              }`}
+            >
+              None
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {filteredTasks.length === 0 ? (
+        <div className="task-state">
+          <p className="task-state__message">No tasks match the selected filters.</p>
+        </div>
+      ) : (
+        <ul className="task-card__items">
+          {filteredTasks.map((task) => {
           const isExpanded = expandedTaskIds.has(task.id);
           const description = task.description?.trim();
           const badgeClass = SOURCE_BADGE_CLASS[task.source] || "default";
@@ -626,7 +726,8 @@ export default function TaskList() {
             </li>
           );
         })}
-      </ul>
+        </ul>
+      )}
     </div>
   );
 }
