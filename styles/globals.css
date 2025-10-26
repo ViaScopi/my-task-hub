@@ -516,6 +516,149 @@ main {
   grid-column: 1 / -1;
 }
 
+/* Today View Styles */
+.today-budget {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.04));
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 18px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.today-budget--almost {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.08), rgba(251, 191, 36, 0.04));
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.today-budget--over {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.08), rgba(220, 38, 38, 0.04));
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+.today-budget__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.today-budget__icon {
+  font-size: 2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.today-budget__content {
+  flex: 1;
+}
+
+.today-budget__title {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--slate-900);
+}
+
+.today-budget__time {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.95rem;
+  color: var(--slate-700);
+}
+
+.today-budget__time strong {
+  font-weight: 700;
+  color: var(--slate-900);
+}
+
+.today-budget__warning {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.today-budget__caution {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.today-budget__unestimated {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--slate-500);
+  font-style: italic;
+}
+
+.today-budget__bar {
+  margin-top: 1rem;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.today-budget__bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #059669);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.today-budget--almost .today-budget__bar-fill {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.today-budget--over .today-budget__bar-fill {
+  background: linear-gradient(90deg, #dc2626, #b91c1c);
+}
+
+.task-item--today {
+  border-left: 3px solid var(--accent);
+  padding-left: 1rem;
+}
+
+.task-item__time-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.75rem;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent-strong);
+  margin-top: 0.5rem;
+}
+
+.today-tips {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: rgba(99, 102, 241, 0.04);
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 18px;
+}
+
+.today-tips__title {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--slate-800);
+}
+
+.today-tips__list {
+  margin: 0;
+  padding-left: 1.5rem;
+  list-style: disc;
+}
+
+.today-tips__list li {
+  margin-bottom: 0.5rem;
+  color: var(--slate-700);
+  line-height: 1.6;
+}
+
+.today-tips__list li:last-child {
+  margin-bottom: 0;
+}
+
 /* Filter Controls for Dashboard */
 .filter-controls {
   display: flex;

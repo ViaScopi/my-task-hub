@@ -6,6 +6,7 @@ import { useAuth } from "../pages/_app";
 const NAV_LINKS = [
   { href: "/", label: "Home", requiresAuth: false, hideWhenAuth: true },
   { href: "/dashboard", label: "Dashboard", requiresAuth: true },
+  { href: "/today", label: "Today", requiresAuth: true },
   { href: "/calendar", label: "Calendar", requiresAuth: true },
   { href: "/kanban", label: "Kanban Board", requiresAuth: true },
   { href: "/archived", label: "Archive", requiresAuth: true },
