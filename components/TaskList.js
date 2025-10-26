@@ -271,6 +271,106 @@ export default function TaskList() {
     }
   };
 
+  const updateTaskTimeEstimate = async (task, newTimeEstimate) => {
+    if (!task || !task.originalId) {
+      return;
+    }
+
+    setTaskStates((prev) => ({
+      ...prev,
+      [task.id]: {
+        ...(prev[task.id] || {}),
+        timeEstimateLoading: true,
+        timeEstimateError: "",
+      },
+    }));
+
+    try {
+      const response = await fetch("/api/task-metadata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: task.source,
+          originalId: task.originalId,
+          timeEstimate: newTimeEstimate === "" ? null : parseInt(newTimeEstimate, 10),
+        }),
+      });
+
+      const responseData = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = responseData?.error || "Failed to update time estimate.";
+        throw new Error(message);
+      }
+
+      setTasks((prevTasks) =>
+        prevTasks.map((item) =>
+          item.id === task.id
+            ? { ...item, timeEstimate: newTimeEstimate === "" ? null : parseInt(newTimeEstimate, 10) }
+            : item
+        )
+      );
+
+      setTaskStates((prev) => {
+        const next = { ...prev };
+        if (next[task.id]) {
+          delete next[task.id].timeEstimateLoading;
+          delete next[task.id].timeEstimateError;
+        }
+        return next;
+      });
+    } catch (err) {
+      console.error("Failed to update time estimate:", err);
+      setTaskStates((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          timeEstimateLoading: false,
+          timeEstimateError: err.message || "Unable to update time estimate.",
+        },
+      }));
+    }
+  };
+
+  const toggleTaskToday = async (task) => {
+    if (!task || !task.originalId) {
+      return;
+    }
+
+    const newIsToday = !task.isToday;
+
+    // Optimistically update UI
+    setTasks((prevTasks) =>
+      prevTasks.map((item) =>
+        item.id === task.id ? { ...item, isToday: newIsToday } : item
+      )
+    );
+
+    try {
+      const response = await fetch("/api/task-metadata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: task.source,
+          originalId: task.originalId,
+          isToday: newIsToday,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update today flag");
+      }
+    } catch (err) {
+      console.error("Failed to toggle today flag:", err);
+      // Revert on error
+      setTasks((prevTasks) =>
+        prevTasks.map((item) =>
+          item.id === task.id ? { ...item, isToday: !newIsToday } : item
+        )
+      );
+    }
+  };
+
   const updateTaskPriority = async (task, newPriority) => {
     if (!task || !task.originalId) {
       console.error("Missing task or originalId:", { task, hasOriginalId: !!task?.originalId });
@@ -705,6 +805,51 @@ export default function TaskList() {
                       <option value="high">High</option>
                     </select>
                     {priorityState.error && <p className="task-item__error">{priorityState.error}</p>}
+                  </div>
+
+                  {/* Time Estimate Dropdown */}
+                  <div className="task-item__priority">
+                    <label htmlFor={`time-${task.id}`}>
+                      Time Estimate
+                      {task.timeEstimate && (
+                        <span className="task-item__label-hint">
+                          ({task.timeEstimate < 60 ? `${task.timeEstimate}m` : `${Math.floor(task.timeEstimate / 60)}h ${task.timeEstimate % 60}m`})
+                        </span>
+                      )}
+                    </label>
+                    <select
+                      id={`time-${task.id}`}
+                      className="task-item__priority-select"
+                      value={task.timeEstimate || ""}
+                      onChange={(event) => updateTaskTimeEstimate(task, event.target.value)}
+                      disabled={Boolean(taskState.timeEstimateLoading)}
+                    >
+                      <option value="">Not set</option>
+                      <option value="15">15 minutes</option>
+                      <option value="30">30 minutes</option>
+                      <option value="60">1 hour</option>
+                      <option value="90">1.5 hours</option>
+                      <option value="120">2 hours</option>
+                      <option value="180">3 hours</option>
+                      <option value="240">4 hours</option>
+                      <option value="480">Full day (8h)</option>
+                    </select>
+                    {taskState.timeEstimateError && <p className="task-item__error">{taskState.timeEstimateError}</p>}
+                  </div>
+
+                  {/* Today Toggle */}
+                  <div className="task-item__priority">
+                    <label className="task-item__checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={task.isToday || false}
+                        onChange={() => toggleTaskToday(task)}
+                        className="task-item__checkbox"
+                      />
+                      <span className="task-item__checkbox-text">
+                        Add to Today list {task.isToday && "✓"}
+                      </span>
+                    </label>
                   </div>
 
                   {/* Pipeline/List Dropdown for Google Tasks */}

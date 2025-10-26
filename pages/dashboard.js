@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth } from "./_app";
 import EventList from "../components/EventList";
 import TaskList from "../components/TaskList";
+import CompletionStats from "../components/CompletionStats";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -78,6 +79,9 @@ export default function DashboardPage() {
           </Link>
         </div>
       </section>
+
+      <CompletionStats />
+
       <div className="dashboard__columns">
         <section className="dashboard__tasks" aria-label="Task rundown">
           <TaskList />
