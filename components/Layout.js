@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "../pages/_app";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
+import KeyboardShortcutsHelp from "./KeyboardShortcutsHelp";
 
 const NAV_LINKS = [
   { href: "/", label: "Home", requiresAuth: false, hideWhenAuth: true },
@@ -18,6 +20,13 @@ export default function Layout({ children }) {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const isSignedIn = Boolean(user);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+
+  // Enable keyboard shortcuts
+  useKeyboardShortcuts({
+    onShowHelp: () => setShowKeyboardHelp(true),
+    onEscape: () => setShowKeyboardHelp(false),
+  });
 
   const navigationLinks = useMemo(() => {
     return NAV_LINKS.filter((link) => {
@@ -74,6 +83,17 @@ export default function Layout({ children }) {
           </nav>
 
           <div className="site-header__actions">
+            {isSignedIn && (
+              <button
+                type="button"
+                onClick={() => setShowKeyboardHelp(true)}
+                className="button button--ghost site-header__button site-header__keyboard-btn"
+                aria-label="Show keyboard shortcuts"
+                title="Keyboard shortcuts (press ?)"
+              >
+                ⌨️
+              </button>
+            )}
             {isSignedIn ? (
               <>
                 <span className="site-header__user" aria-live="polite">
@@ -97,6 +117,10 @@ export default function Layout({ children }) {
       </header>
 
       <div className="site-content">{children}</div>
+
+      {showKeyboardHelp && (
+        <KeyboardShortcutsHelp onClose={() => setShowKeyboardHelp(false)} />
+      )}
     </div>
   );
 }

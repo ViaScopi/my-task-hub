@@ -3333,3 +3333,219 @@ a:not(.task-item__title):not(.event-item__title),
     width: 100%;
   }
 }
+
+/* Keyboard Shortcuts */
+.site-header__keyboard-btn {
+  font-size: 1.25rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.keyboard-help {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 2rem;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.keyboard-help__modal {
+  background: white;
+  border-radius: 20px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.keyboard-help__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2rem 2rem 1rem 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.keyboard-help__title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin: 0;
+}
+
+.keyboard-help__close {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--slate-600);
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.keyboard-help__close:hover {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--accent);
+}
+
+.keyboard-help__content {
+  padding: 2rem;
+}
+
+.keyboard-help__description {
+  color: var(--slate-600);
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+
+.keyboard-help__section {
+  margin-bottom: 2rem;
+}
+
+.keyboard-help__section:last-child {
+  margin-bottom: 0;
+}
+
+.keyboard-help__section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin: 0 0 1rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+
+.keyboard-help__shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.keyboard-help__shortcut {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(99, 102, 241, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.keyboard-help__keys {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.keyboard-help__key {
+  background: white;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--slate-700);
+  box-shadow: 0 2px 0 var(--border),
+              0 3px 5px rgba(0, 0, 0, 0.1);
+  display: inline-block;
+  min-width: 2rem;
+  text-align: center;
+}
+
+.keyboard-help__shortcut-description {
+  color: var(--slate-700);
+  font-weight: 500;
+  flex: 1;
+}
+
+.keyboard-help__tip {
+  margin-top: 2rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.04));
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 12px;
+  color: var(--slate-700);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.keyboard-help__tip strong {
+  color: var(--success-strong);
+}
+
+.keyboard-help__tip kbd {
+  margin: 0 0.125rem;
+}
+
+/* Responsive Keyboard Help */
+@media (max-width: 768px) {
+  .keyboard-help {
+    padding: 1rem;
+  }
+
+  .keyboard-help__modal {
+    border-radius: 16px;
+  }
+
+  .keyboard-help__header {
+    padding: 1.5rem 1.5rem 1rem 1.5rem;
+  }
+
+  .keyboard-help__title {
+    font-size: 1.5rem;
+  }
+
+  .keyboard-help__content {
+    padding: 1.5rem;
+  }
+
+  .keyboard-help__shortcut {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .keyboard-help__keys {
+    width: 100%;
+  }
+
+  .site-header__keyboard-btn {
+    font-size: 1.1rem;
+    padding: 0.4rem 0.6rem;
+  }
+}
