@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useAuth } from "../pages/_app";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import KeyboardShortcutsHelp from "./KeyboardShortcutsHelp";
@@ -22,12 +22,29 @@ export default function Layout({ children }) {
   const router = useRouter();
   const isSignedIn = Boolean(user);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Enable keyboard shortcuts
   useKeyboardShortcuts({
     onShowHelp: () => setShowKeyboardHelp(true),
-    onEscape: () => setShowKeyboardHelp(false),
+    onEscape: () => {
+      setShowKeyboardHelp(false);
+      setMobileMenuOpen(false);
+    },
   });
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.classList.add('menu-open');
+    } else {
+      document.body.classList.remove('menu-open');
+    }
+
+    return () => {
+      document.body.classList.remove('menu-open');
+    };
+  }, [mobileMenuOpen]);
 
   const navigationLinks = useMemo(() => {
     return NAV_LINKS.filter((link) => {
@@ -59,6 +76,10 @@ export default function Layout({ children }) {
     router.push("/");
   };
 
+  const handleNavLinkClick = () => {
+    setMobileMenuOpen(false);
+  };
+
   return (
     <div className="app-shell">
       <header className="site-header">
@@ -67,7 +88,8 @@ export default function Layout({ children }) {
             My Task Hub
           </Link>
 
-          <nav className="site-nav" aria-label="Main navigation">
+          {/* Desktop Navigation */}
+          <nav className="site-nav site-nav--desktop" aria-label="Main navigation">
             {navigationLinks.map((link) => {
               const isActive = router.pathname === link.href;
 
@@ -97,13 +119,13 @@ export default function Layout({ children }) {
             )}
             {isSignedIn ? (
               <>
-                <span className="site-header__user" aria-live="polite">
+                <span className="site-header__user site-header__user--desktop" aria-live="polite">
                   Hi, {displayName}
                 </span>
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="button button--ghost site-header__button"
+                  className="button button--ghost site-header__button site-header__button--desktop"
                 >
                   Log out
                 </button>
@@ -113,9 +135,88 @@ export default function Layout({ children }) {
                 Log in
               </Link>
             )}
+
+            {/* Hamburger Menu Button */}
+            {isSignedIn && (
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="site-header__hamburger"
+                aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+                aria-expanded={mobileMenuOpen}
+              >
+                <span className={`site-header__hamburger-line ${mobileMenuOpen ? 'site-header__hamburger-line--open' : ''}`}></span>
+                <span className={`site-header__hamburger-line ${mobileMenuOpen ? 'site-header__hamburger-line--open' : ''}`}></span>
+                <span className={`site-header__hamburger-line ${mobileMenuOpen ? 'site-header__hamburger-line--open' : ''}`}></span>
+              </button>
+            )}
           </div>
         </div>
       </header>
+
+      {/* Mobile Navigation Menu */}
+      {isSignedIn && (
+        <>
+          <div
+            className={`site-nav-mobile-backdrop ${mobileMenuOpen ? 'site-nav-mobile-backdrop--open' : ''}`}
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden={!mobileMenuOpen}
+          />
+          <nav
+            className={`site-nav-mobile ${mobileMenuOpen ? 'site-nav-mobile--open' : ''}`}
+            aria-label="Mobile navigation"
+          >
+            <div className="site-nav-mobile__header">
+              <span className="site-nav-mobile__user">Hi, {displayName}</span>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="site-nav-mobile__close"
+                aria-label="Close menu"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="site-nav-mobile__links">
+              {navigationLinks.map((link) => {
+                const isActive = router.pathname === link.href;
+
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`site-nav-mobile__link${isActive ? " site-nav-mobile__link--active" : ""}`}
+                    onClick={handleNavLinkClick}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
+
+            <div className="site-nav-mobile__footer">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowKeyboardHelp(true);
+                  setMobileMenuOpen(false);
+                }}
+                className="button button--ghost button--block"
+              >
+                ⌨️ Keyboard Shortcuts
+              </button>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="button button--ghost button--block"
+              >
+                Log out
+              </button>
+            </div>
+          </nav>
+        </>
+      )}
 
       <div className="site-content">{children}</div>
 
