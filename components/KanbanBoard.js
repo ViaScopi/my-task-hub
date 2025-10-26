@@ -388,6 +388,45 @@ export default function KanbanBoard() {
     }
   };
 
+  const toggleTaskToday = async (task) => {
+    if (!task || !task.originalId) {
+      return;
+    }
+
+    const newIsToday = !task.isToday;
+
+    // Optimistically update UI
+    setTasks((prevTasks) =>
+      prevTasks.map((item) =>
+        item.id === task.id ? { ...item, isToday: newIsToday } : item
+      )
+    );
+
+    try {
+      const response = await fetch("/api/task-metadata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: task.source,
+          originalId: task.originalId,
+          isToday: newIsToday,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update today flag");
+      }
+    } catch (err) {
+      console.error("Failed to toggle today flag:", err);
+      // Revert on error
+      setTasks((prevTasks) =>
+        prevTasks.map((item) =>
+          item.id === task.id ? { ...item, isToday: !newIsToday } : item
+        )
+      );
+    }
+  };
+
   const updatePipeline = async (task, targetListId) => {
     if (!task || task.source !== "Google Tasks") {
       return;
@@ -1270,6 +1309,21 @@ export default function KanbanBoard() {
                             {taskState.timeEstimateError && (
                               <p className="kanban-board__card-error">{taskState.timeEstimateError}</p>
                             )}
+                          </div>
+
+                          {/* Today Toggle */}
+                          <div className="kanban-board__card-field">
+                            <label className="kanban-board__card-checkbox-label">
+                              <input
+                                type="checkbox"
+                                checked={task.isToday || false}
+                                onChange={() => toggleTaskToday(task)}
+                                className="kanban-board__card-checkbox"
+                              />
+                              <span className="kanban-board__card-checkbox-text">
+                                Add to Today list {task.isToday && "✓"}
+                              </span>
+                            </label>
                           </div>
 
                           {/* Pipeline/List Dropdown for Google Tasks */}

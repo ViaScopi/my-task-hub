@@ -332,6 +332,45 @@ export default function TaskList() {
     }
   };
 
+  const toggleTaskToday = async (task) => {
+    if (!task || !task.originalId) {
+      return;
+    }
+
+    const newIsToday = !task.isToday;
+
+    // Optimistically update UI
+    setTasks((prevTasks) =>
+      prevTasks.map((item) =>
+        item.id === task.id ? { ...item, isToday: newIsToday } : item
+      )
+    );
+
+    try {
+      const response = await fetch("/api/task-metadata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: task.source,
+          originalId: task.originalId,
+          isToday: newIsToday,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update today flag");
+      }
+    } catch (err) {
+      console.error("Failed to toggle today flag:", err);
+      // Revert on error
+      setTasks((prevTasks) =>
+        prevTasks.map((item) =>
+          item.id === task.id ? { ...item, isToday: !newIsToday } : item
+        )
+      );
+    }
+  };
+
   const updateTaskPriority = async (task, newPriority) => {
     if (!task || !task.originalId) {
       console.error("Missing task or originalId:", { task, hasOriginalId: !!task?.originalId });
@@ -796,6 +835,21 @@ export default function TaskList() {
                       <option value="480">Full day (8h)</option>
                     </select>
                     {taskState.timeEstimateError && <p className="task-item__error">{taskState.timeEstimateError}</p>}
+                  </div>
+
+                  {/* Today Toggle */}
+                  <div className="task-item__priority">
+                    <label className="task-item__checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={task.isToday || false}
+                        onChange={() => toggleTaskToday(task)}
+                        className="task-item__checkbox"
+                      />
+                      <span className="task-item__checkbox-text">
+                        Add to Today list {task.isToday && "✓"}
+                      </span>
+                    </label>
                   </div>
 
                   {/* Pipeline/List Dropdown for Google Tasks */}
