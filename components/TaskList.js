@@ -10,6 +10,25 @@ const SOURCE_BADGE_CLASS = {
 
 const isTrelloTask = (task) => task?.source === "Trello" || task?.source === "Fellow";
 
+function isTaskCompleted(task) {
+  if (!task) return false;
+
+  // Check based on source
+  if (task.source === "GitHub") {
+    return task.state === "closed" || task.status === "closed";
+  }
+
+  if (task.source === "Google Tasks") {
+    return task.status === "completed";
+  }
+
+  if (isTrelloTask(task)) {
+    return task.status === "Closed" || task.status === "Completed" || task.closed === true;
+  }
+
+  return false;
+}
+
 function formatDueDate(value) {
   if (!value) {
     return "";
@@ -180,13 +199,20 @@ export default function TaskList() {
         throw new Error(data?.details || data?.error || "Failed to complete task");
       }
 
-      // Remove from task list
-      setTasks((prevTasks) => prevTasks.filter((item) => item.id !== task.id));
-      setExpandedTaskIds((prev) => {
-        const next = new Set(prev);
-        next.delete(task.id);
-        return next;
-      });
+      // Task is now marked complete at source, will show as completed on next reload
+      setTaskStates((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          completeLoading: false,
+          completeError: "",
+        },
+      }));
+
+      // Reload tasks to get updated status
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error("Error completing task:", error);
       setTaskStates((prev) => ({
@@ -195,6 +221,51 @@ export default function TaskList() {
           ...(prev[task.id] || {}),
           completeLoading: false,
           completeError: error.message || "Failed to complete task",
+        },
+      }));
+    }
+  };
+
+  const archiveTask = async (task) => {
+    const note = taskComments[task.id]?.trim() || "";
+
+    setTaskStates((prev) => ({
+      ...prev,
+      [task.id]: {
+        ...(prev[task.id] || {}),
+        archiveLoading: true,
+        archiveError: "",
+      },
+    }));
+
+    try {
+      const response = await fetch("/api/task-archive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task, note }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.details || data?.error || "Failed to archive task");
+      }
+
+      // Remove from task list
+      setTasks((prevTasks) => prevTasks.filter((item) => item.id !== task.id));
+      setExpandedTaskIds((prev) => {
+        const next = new Set(prev);
+        next.delete(task.id);
+        return next;
+      });
+    } catch (error) {
+      console.error("Error archiving task:", error);
+      setTaskStates((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          archiveLoading: false,
+          archiveError: error.message || "Failed to archive task",
         },
       }));
     }
@@ -707,19 +778,40 @@ export default function TaskList() {
                     </div>
                   </div>
 
-                  {/* Unified Complete Button */}
+                  {/* Complete or Archive Button */}
                   <div className="task-item__completion-section">
-                    {taskState.completeError && (
-                      <p className="task-item__error">{taskState.completeError}</p>
+                    {isTaskCompleted(task) ? (
+                      <>
+                        {taskState.archiveError && (
+                          <p className="task-item__error">{taskState.archiveError}</p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => archiveTask(task)}
+                          className="button button--archive"
+                          disabled={Boolean(taskState.archiveLoading)}
+                        >
+                          {taskState.archiveLoading ? "Archiving..." : "Archive Task"}
+                        </button>
+                        <p className="task-item__hint">
+                          Archiving removes this task from your active views
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        {taskState.completeError && (
+                          <p className="task-item__error">{taskState.completeError}</p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => completeTask(task)}
+                          className="button button--success"
+                          disabled={Boolean(taskState.completeLoading)}
+                        >
+                          {taskState.completeLoading ? "Completing..." : "Mark Complete"}
+                        </button>
+                      </>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => completeTask(task)}
-                      className="button button--success"
-                      disabled={Boolean(taskState.completeLoading)}
-                    >
-                      {taskState.completeLoading ? "Completing..." : "Mark Complete"}
-                    </button>
                   </div>
                 </div>
               )}

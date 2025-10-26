@@ -205,12 +205,6 @@ function mapCardsToTasks(cards, boardLists = new Map()) {
       }
     }
 
-    const normalizedListName = listName.toLowerCase();
-
-    if (normalizedListName === "completed") {
-      continue;
-    }
-
     const due = card.due || null;
 
     let status = "";
@@ -251,7 +245,7 @@ async function fetchMemberCards(baseUrl, key, token, memberId, limit) {
   const url = new URL(buildUrl(baseUrl, `members/${encodeURIComponent(memberId)}/cards`));
   url.searchParams.set("key", key);
   url.searchParams.set("token", token);
-  url.searchParams.set("filter", "open");
+  url.searchParams.set("filter", "all");
   url.searchParams.set(
     "fields",
     "name,url,shortUrl,due,dueComplete,idBoard,idList,desc,closed"

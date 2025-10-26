@@ -478,6 +478,70 @@ export default function KanbanBoard() {
     }
   };
 
+  const archiveTask = async (task) => {
+    if (!task) {
+      return;
+    }
+
+    const note = taskComments[task.id]?.trim() || "";
+
+    setTaskStates((prev) => ({
+      ...prev,
+      [task.id]: {
+        ...(prev[task.id] || {}),
+        archiveLoading: true,
+        archiveError: "",
+        archiveSuccess: "",
+      },
+    }));
+
+    try {
+      const response = await fetch("/api/task-archive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task, note }),
+      });
+
+      const responseData = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = responseData?.error || responseData?.details || "Failed to archive task.";
+        throw new Error(message);
+      }
+
+      // Remove task from the list
+      setTasks((prevTasks) => prevTasks.filter((item) => item.id !== task.id));
+
+      // Clean up state
+      setExpandedTaskIds((prev) => {
+        const next = new Set(prev);
+        next.delete(task.id);
+        return next;
+      });
+      setTaskComments((prev) => {
+        const next = { ...prev };
+        delete next[task.id];
+        return next;
+      });
+      setTaskStates((prev) => {
+        const next = { ...prev };
+        delete next[task.id];
+        return next;
+      });
+    } catch (err) {
+      console.error("Failed to archive task:", err);
+      setTaskStates((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...(prev[task.id] || {}),
+          archiveLoading: false,
+          archiveError: err.message || "Unable to archive task.",
+          archiveSuccess: "",
+        },
+      }));
+    }
+  };
+
   const columns = useMemo(() => {
     const grouped = Object.fromEntries(STAGES.map((stage) => [stage, []]));
 
@@ -1191,6 +1255,26 @@ export default function KanbanBoard() {
                               {taskState.commentLoading ? "Posting..." : "Add Comment"}
                             </button>
                           </div>
+
+                          {/* Archive button - only show for tasks in Done column */}
+                          {stage === "Done" && (
+                            <div className="kanban-board__card-field">
+                              {taskState.archiveError && (
+                                <p className="kanban-board__card-error">{taskState.archiveError}</p>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => archiveTask(task)}
+                                className="kanban-board__card-btn kanban-board__card-btn--archive"
+                                disabled={Boolean(taskState.archiveLoading)}
+                              >
+                                {taskState.archiveLoading ? "Archiving..." : "Archive Task"}
+                              </button>
+                              <p className="kanban-board__card-hint">
+                                Archiving removes this task from your active views
+                              </p>
+                            </div>
+                          )}
                         </div>
                       )}
 

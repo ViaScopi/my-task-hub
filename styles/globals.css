@@ -472,6 +472,50 @@ main {
   border-top: 1px solid rgba(99, 102, 241, 0.12);
 }
 
+.task-item__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--slate-500);
+  font-style: italic;
+}
+
+.task-item--archived {
+  opacity: 0.85;
+}
+
+.task-item__archive-meta {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(99, 102, 241, 0.08);
+  display: grid;
+  gap: 0.5rem;
+}
+
+.task-item__archive-date {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--slate-500);
+  font-weight: 600;
+}
+
+.task-item__archive-notes {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--slate-700);
+  padding: 0.5rem 0.75rem;
+  background: rgba(99, 102, 241, 0.05);
+  border-radius: 8px;
+}
+
+.task-item__archive-notes strong {
+  color: var(--slate-800);
+  font-weight: 700;
+}
+
+.dashboard__tasks--full {
+  grid-column: 1 / -1;
+}
+
 /* Filter Controls for Dashboard */
 .filter-controls {
   display: flex;
@@ -571,6 +615,17 @@ main {
 .button--success:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 22px 40px -22px rgba(16, 185, 129, 0.55);
+}
+
+.button--archive {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  box-shadow: 0 16px 32px -20px rgba(217, 119, 6, 0.6);
+}
+
+.button--archive:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 20px 40px -22px rgba(217, 119, 6, 0.65);
 }
 
 .button--primary {
@@ -1629,6 +1684,37 @@ main {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+
+.kanban-board__card-btn--secondary {
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--accent-strong);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  box-shadow: none;
+}
+
+.kanban-board__card-btn--secondary:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 8px 16px -12px rgba(79, 70, 229, 0.4);
+}
+
+.kanban-board__card-btn--archive {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  box-shadow: 0 12px 24px -18px rgba(217, 119, 6, 0.55);
+}
+
+.kanban-board__card-btn--archive:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 30px -20px rgba(217, 119, 6, 0.6);
+}
+
+.kanban-board__card-hint {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.75rem;
+  color: var(--slate-500);
+  font-style: italic;
 }
 
 .kanban-board__card-error {

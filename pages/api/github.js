@@ -37,11 +37,13 @@ export default async function handler(req, res) {
 
     if (req.method === "GET") {
       try {
-        // Get all open issues assigned to the authenticated user
+        // Get all issues assigned to the authenticated user (both open and closed)
         const { data } = await octokit.rest.issues.listForAuthenticatedUser({
           filter: "assigned",
-          state: "open",
-          per_page: 50,
+          state: "all",
+          per_page: 100,
+          sort: "updated",
+          direction: "desc",
         });
 
         const tasks = data.map((issue) => ({
@@ -52,6 +54,8 @@ export default async function handler(req, res) {
           repo: issue.repository.full_name,
           issue_number: issue.number,
           description: issue.body || "",
+          status: issue.state, // 'open' or 'closed'
+          state: issue.state,
         }));
 
         return res.status(200).json(tasks);

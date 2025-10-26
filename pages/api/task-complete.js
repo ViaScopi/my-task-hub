@@ -1,7 +1,6 @@
 import { Octokit } from "@octokit/rest";
 import { google } from "googleapis";
 import { createClient } from "../../lib/supabase/api";
-import { deriveOriginalId } from "../../lib/taskIdentity";
 
 async function getUserIntegration(supabase, userId, provider) {
   const { data, error } = await supabase
@@ -112,37 +111,6 @@ async function completeTrelloTask(task, note, accessToken) {
   });
 }
 
-async function persistCompletedTask(supabase, userId, task, note) {
-  const originalId = deriveOriginalId(task);
-  const timestamp = new Date().toISOString();
-
-  const payload = {
-    user_id: userId,
-    source: task.source || "Other",
-    original_id: originalId,
-    title: task.title || task.name || "Untitled task",
-    description: task.description || "",
-    status: "completed",
-    completed_at: timestamp,
-    notes: note || "",
-    url: task.url || null,
-    repo: task.repo || null,
-    pipeline_id: task.pipelineId || null,
-    pipeline_name: task.pipelineName || null,
-  };
-
-  const { error } = await supabase
-    .from("completed_tasks")
-    .upsert(payload, {
-      onConflict: "user_id,source,original_id",
-    });
-
-  if (error) {
-    console.error("Error persisting completed task:", error);
-    throw new Error("Failed to save completion record");
-  }
-}
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -194,9 +162,8 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: `Unsupported task source: ${source}` });
     }
 
-    // Persist to completed_tasks table
-    await persistCompletedTask(supabase, user.id, task, note);
-
+    // Task is now completed at the source
+    // It will remain visible in the Done column until user archives it
     return res.status(200).json({ success: true });
   } catch (error) {
     console.error("Error completing task:", error);
