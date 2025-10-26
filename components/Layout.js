@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", requiresAuth: true },
   { href: "/today", label: "Today", requiresAuth: true },
   { href: "/focus", label: "Focus", requiresAuth: true },
+  { href: "/analytics", label: "Analytics", requiresAuth: true },
   { href: "/calendar", label: "Calendar", requiresAuth: true },
   { href: "/kanban", label: "Kanban Board", requiresAuth: true },
   { href: "/archived", label: "Archive", requiresAuth: true },

@@ -3995,3 +3995,334 @@ a:not(.task-item__title):not(.event-item__title),
     font-size: 0.6rem;
   }
 }
+
+/* Analytics Page */
+.analytics-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.analytics-summary__card {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.04));
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: all 0.2s ease;
+}
+
+.analytics-summary__card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.15);
+}
+
+.analytics-summary__icon {
+  font-size: 2.5rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.analytics-summary__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.analytics-summary__value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--slate-900);
+  line-height: 1;
+}
+
+.analytics-summary__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--slate-600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.analytics-section {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.analytics-section__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin: 0 0 1.5rem 0;
+}
+
+/* Weekly Overview */
+.analytics-weekly {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  padding: 1.5rem;
+}
+
+.analytics-weekly__stat {
+  text-align: center;
+}
+
+.analytics-weekly__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--slate-600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.analytics-weekly__value {
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.analytics-weekly__arrow {
+  font-size: 2rem;
+}
+
+.analytics-weekly__change {
+  margin-left: 1rem;
+}
+
+.analytics-weekly__change-badge {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.analytics-weekly__change-badge--up {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success-strong);
+}
+
+.analytics-weekly__change-badge--down {
+  background: rgba(220, 38, 38, 0.15);
+  color: #dc2626;
+}
+
+.analytics-weekly__change-badge--flat {
+  background: rgba(100, 116, 139, 0.15);
+  color: var(--slate-600);
+}
+
+/* 30-Day Trend */
+.analytics-trend {
+  display: grid;
+  grid-template-columns: repeat(30, 1fr);
+  gap: 2px;
+  align-items: end;
+  padding: 1rem 0;
+}
+
+.analytics-trend__bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.analytics-trend__bar-wrapper {
+  width: 100%;
+  height: 100px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.analytics-trend__bar {
+  width: 100%;
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: opacity 0.2s ease;
+  cursor: default;
+}
+
+.analytics-trend__bar:hover {
+  opacity: 0.7;
+}
+
+.analytics-trend__bar--today {
+  background: linear-gradient(180deg, var(--success), var(--success-strong));
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.analytics-trend__label {
+  font-size: 0.65rem;
+  color: var(--slate-500);
+  font-weight: 600;
+}
+
+/* Weekdays Chart */
+.analytics-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.analytics-weekdays__bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.analytics-weekdays__bar-wrapper {
+  width: 100%;
+  height: 150px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.analytics-weekdays__bar {
+  width: 100%;
+  background: linear-gradient(180deg, var(--success), var(--success-strong));
+  border-radius: 8px 8px 4px 4px;
+  min-height: 4px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 0.5rem;
+  transition: all 0.3s ease;
+  cursor: default;
+}
+
+.analytics-weekdays__bar:hover {
+  opacity: 0.85;
+  transform: scaleY(1.05);
+}
+
+.analytics-weekdays__count {
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.analytics-weekdays__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--slate-700);
+}
+
+/* Sources */
+.analytics-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.analytics-sources__item {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+}
+
+.analytics-sources__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.analytics-sources__source {
+  font-weight: 700;
+  color: var(--slate-900);
+  font-size: 1.05rem;
+}
+
+.analytics-sources__count {
+  font-weight: 600;
+  color: var(--slate-600);
+  font-size: 0.95rem;
+}
+
+.analytics-sources__bar-bg {
+  width: 100%;
+  height: 12px;
+  background: rgba(203, 213, 225, 0.3);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.analytics-sources__bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  border-radius: 999px;
+  transition: width 0.8s ease;
+}
+
+.analytics-sources__percentage {
+  text-align: right;
+  font-size: 0.9rem;
+  color: var(--slate-500);
+  font-weight: 700;
+}
+
+.analytics-sources__empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--slate-500);
+  font-size: 0.95rem;
+}
+
+/* Responsive Analytics */
+@media (max-width: 768px) {
+  .analytics-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .analytics-weekly {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .analytics-weekly__arrow {
+    transform: rotate(90deg);
+    font-size: 1.5rem;
+  }
+
+  .analytics-weekly__change {
+    margin-left: 0;
+  }
+
+  .analytics-trend__bar-wrapper {
+    height: 60px;
+  }
+
+  .analytics-weekdays__bar-wrapper {
+    height: 100px;
+  }
+
+  .analytics-weekdays__count {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .analytics-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-trend__bar-wrapper {
+    height: 40px;
+  }
+}
