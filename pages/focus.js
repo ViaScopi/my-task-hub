@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { useAuth } from "./_app";
 import { useTasks } from "../hooks/useTasks";
+import PomodoroTimer from "../components/PomodoroTimer";
 
 export default function FocusPage() {
   const router = useRouter();
@@ -197,6 +198,11 @@ export default function FocusPage() {
             </div>
           )}
         </div>
+
+        <PomodoroTimer onSessionComplete={() => {
+          // Optional: Auto-advance to next task after work session
+          // Uncomment if desired: handleNext();
+        }} />
 
         <div className="focus-mode__actions">
           <button
