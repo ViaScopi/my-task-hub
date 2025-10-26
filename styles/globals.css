@@ -2902,3 +2902,246 @@ a:not(.task-item__title):not(.event-item__title),
     grid-template-columns: 1fr !important;
   }
 }
+
+/* Focus Mode */
+.focus-mode {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  margin: 0;
+}
+
+.focus-mode__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.focus-mode__progress {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.focus-mode__progress-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.focus-mode__badge {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.focus-mode__exit {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.focus-mode__exit:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+.focus-mode__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.focus-mode__task {
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--slate-900);
+  border-radius: 24px;
+  padding: 3rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.focus-mode__task-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.focus-mode__estimate {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--accent-strong);
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.focus-mode__task-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin: 0 0 1.5rem 0;
+  line-height: 1.2;
+}
+
+.focus-mode__task-description {
+  font-size: 1.1rem;
+  line-height: 1.7;
+  color: var(--slate-700);
+  margin-bottom: 1.5rem;
+}
+
+.focus-mode__task-description p {
+  margin: 0;
+}
+
+.focus-mode__task-detail {
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  color: var(--slate-600);
+}
+
+.focus-mode__task-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.focus-mode__task-link:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+.focus-mode__actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.focus-mode__hint {
+  text-align: center;
+  opacity: 0.8;
+  font-size: 0.95rem;
+  margin-top: 1rem;
+}
+
+.focus-mode__hint p {
+  margin: 0;
+}
+
+.focus-mode__loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.focus-mode__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+}
+
+.focus-mode__empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.focus-mode__empty-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+}
+
+.focus-mode__empty-message {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  margin-bottom: 2rem;
+  max-width: 500px;
+}
+
+.focus-mode__empty-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.button--success {
+  background: var(--success);
+  color: white;
+  border: none;
+}
+
+.button--success:hover {
+  background: var(--success-strong);
+}
+
+.button--large {
+  padding: 0.875rem 2rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+/* Responsive Focus Mode */
+@media (max-width: 768px) {
+  .focus-mode__task {
+    padding: 2rem;
+  }
+
+  .focus-mode__task-title {
+    font-size: 1.75rem;
+  }
+
+  .focus-mode__task-description {
+    font-size: 1rem;
+  }
+
+  .focus-mode__actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .focus-mode__actions .button {
+    width: 100%;
+  }
+
+  .focus-mode__header {
+    padding: 1rem;
+  }
+}
