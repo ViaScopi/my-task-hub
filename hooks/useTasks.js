@@ -232,8 +232,11 @@ export function useTasks() {
 
         const filteredTasks = filterArchivedTasks(integrationTasks, archivedSnapshots);
 
+        // Normalize all tasks to ensure they have originalId
+        const normalizedTasks = filteredTasks.map(ensureOriginalId);
+
         // Add priorities and metadata to tasks
-        const tasksWithMetadata = filteredTasks.map((task) => {
+        const tasksWithMetadata = normalizedTasks.map((task) => {
           const key = `${task.source}:${task.originalId}`;
           const priority = priorities[key] || null;
           const taskMetadata = metadata[key] || {};
