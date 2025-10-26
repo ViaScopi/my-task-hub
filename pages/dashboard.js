@@ -6,6 +6,8 @@ import EventList from "../components/EventList";
 import TaskList from "../components/TaskList";
 import CompletionStats from "../components/CompletionStats";
 import StreakDisplay from "../components/StreakDisplay";
+import WeeklyChart from "../components/WeeklyChart";
+import SourceBreakdown from "../components/SourceBreakdown";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -84,6 +86,11 @@ export default function DashboardPage() {
       <CompletionStats />
 
       <StreakDisplay />
+
+      <div className="dashboard__charts">
+        <WeeklyChart />
+        <SourceBreakdown />
+      </div>
 
       <div className="dashboard__columns">
         <section className="dashboard__tasks" aria-label="Task rundown">
