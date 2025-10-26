@@ -53,10 +53,13 @@ export default function TodayPage() {
           </p>
         </div>
         <div className="dashboard__actions">
+          <Link href="/focus" className="button button--success button--small">
+            🎯 Start Focus Mode
+          </Link>
           <Link href="/dashboard" className="button button--ghost button--small">
             Back to Dashboard
           </Link>
-          <Link href="/kanban" className="button button--primary button--small">
+          <Link href="/kanban" className="button button--ghost button--small">
             Kanban Board
           </Link>
         </div>
