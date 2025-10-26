@@ -1717,6 +1717,20 @@ main {
   font-style: italic;
 }
 
+.kanban-board__card-label-hint {
+  margin-left: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--slate-500);
+}
+
+.task-item__label-hint {
+  margin-left: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--slate-500);
+}
+
 .kanban-board__card-error {
   margin: 0;
   color: #b91c1c;

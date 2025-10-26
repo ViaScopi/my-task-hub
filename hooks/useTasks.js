@@ -162,9 +162,18 @@ export function useTasks() {
 
             return data || {};
           }),
+          fetch("/api/task-metadata", { signal }).then(async (response) => {
+            const data = await response.json().catch(() => null);
+
+            if (!response.ok) {
+              return {}; // Metadata is optional, don't fail if unavailable
+            }
+
+            return data || {};
+          }),
         ];
 
-        const [githubResult, googleResult, trelloResult, completedResult, prioritiesResult] =
+        const [githubResult, googleResult, trelloResult, completedResult, prioritiesResult, metadataResult] =
           await Promise.allSettled(requests);
 
         if (signal?.aborted) {
@@ -215,16 +224,28 @@ export function useTasks() {
           priorities = prioritiesResult.value || {};
         }
 
+        // Get metadata map
+        let metadata = {};
+        if (metadataResult.status === "fulfilled") {
+          metadata = metadataResult.value || {};
+        }
+
         const filteredTasks = filterArchivedTasks(integrationTasks, archivedSnapshots);
 
-        // Add priorities to tasks
-        const tasksWithPriorities = filteredTasks.map((task) => {
-          const priorityKey = `${task.source}:${task.originalId}`;
-          const priority = priorities[priorityKey] || null;
-          return { ...task, priority };
+        // Add priorities and metadata to tasks
+        const tasksWithMetadata = filteredTasks.map((task) => {
+          const key = `${task.source}:${task.originalId}`;
+          const priority = priorities[key] || null;
+          const taskMetadata = metadata[key] || {};
+          return {
+            ...task,
+            priority,
+            timeEstimate: taskMetadata.timeEstimate || null,
+            isToday: taskMetadata.isToday || false,
+          };
         });
 
-        setTasks(tasksWithPriorities);
+        setTasks(tasksWithMetadata);
 
         if (errors.length === 1) {
           setFetchError(`Heads up: ${errors[0]} couldn't be loaded right now.`);
