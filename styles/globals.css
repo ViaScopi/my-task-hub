@@ -2984,6 +2984,10 @@ a:not(.task-item__title):not(.event-item__title),
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   width: 100%;
   margin-bottom: 2rem;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow: hidden;
 }
 
 .focus-mode__task-meta {
@@ -3010,6 +3014,10 @@ a:not(.task-item__title):not(.event-item__title),
   color: var(--slate-900);
   margin: 0 0 1.5rem 0;
   line-height: 1.2;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
 }
 
 .focus-mode__task-description {
@@ -3017,16 +3025,25 @@ a:not(.task-item__title):not(.event-item__title),
   line-height: 1.7;
   color: var(--slate-700);
   margin-bottom: 1.5rem;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
 }
 
 .focus-mode__task-description p {
   margin: 0;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
 }
 
 .focus-mode__task-detail {
   margin-bottom: 0.75rem;
   font-size: 1rem;
   color: var(--slate-600);
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
 }
 
 .focus-mode__task-link {
@@ -3034,6 +3051,9 @@ a:not(.task-item__title):not(.event-item__title),
   text-decoration: none;
   font-weight: 600;
   transition: color 0.2s ease;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-all;
 }
 
 .focus-mode__task-link:hover {
