@@ -27,9 +27,11 @@ async function verifyDatabase() {
   // Test connection and check tables
   const tablesToCheck = [
     'user_integrations',
-    'completed_tasks',
+    'archived_tasks',
     'user_preferences',
-    'task_notes'
+    'task_notes',
+    'task_priorities',
+    'task_metadata'
   ];
 
   console.log('\n📋 Checking tables:\n');

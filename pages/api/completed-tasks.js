@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     try {
       const { data: tasks, error } = await supabase
-        .from("completed_tasks")
+        .from("archived_tasks")
         .select("*")
         .eq("user_id", user.id)
         .order("completed_at", { ascending: false });
@@ -55,6 +55,7 @@ export default async function handler(req, res) {
         description: snapshot.description || null,
         status: snapshot.status || "completed",
         completed_at: snapshot.completed_at || snapshot.completedAt || new Date().toISOString(),
+        archived_at: snapshot.archived_at || snapshot.archivedAt || new Date().toISOString(),
         notes: snapshot.notes || null,
         url: snapshot.url || null,
         repo: snapshot.repo || null,
@@ -65,7 +66,7 @@ export default async function handler(req, res) {
 
       // Upsert the completed task (insert or update if exists)
       const { data: saved, error } = await supabase
-        .from("completed_tasks")
+        .from("archived_tasks")
         .upsert(taskData, {
           onConflict: "user_id,source,original_id",
         })
