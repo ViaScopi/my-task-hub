@@ -193,7 +193,7 @@ export default function Layout({ children }) {
         </>
       )}
 
-      <main className={`site-content ${isSignedIn && sidebarOpen ? 'site-content--sidebar-open' : ''}`}>
+      <main className="site-content">
         {children}
       </main>
 
